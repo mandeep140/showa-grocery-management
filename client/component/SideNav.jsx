@@ -8,6 +8,7 @@ import { TbReport } from "react-icons/tb";
 import Image from 'next/image'
 import { useState } from 'react'
 import Link from 'next/link'
+import ClientTopAvatar from './ClientTopAvatar'
 
 const SideNav = ({ children }) => {
     const pathname = usePathname();
@@ -36,7 +37,7 @@ const SideNav = ({ children }) => {
 
     return (
         <>
-            <div className={`h-screen bg-[#56A291] flex flex-col fixed left-0 top-0 z-50 ${hovered ? 'w-[50' : 'w-20'} transition-all duration-300`}
+            <div className={`h-screen bg-[#56A291] flex flex-col fixed left-0 top-0 z-50 ${hovered ? 'w-52' : 'w-20'} transition-all duration-300`}
                 onMouseEnter={() => setHovered(true)}
                 onMouseLeave={() => setHovered(false)}
             >
@@ -59,6 +60,7 @@ const SideNav = ({ children }) => {
                 <Image src='/svg/logo2.svg' alt="showa logo" width={60} height={60} className='mt-auto mx-auto mb-4' />
             </div>
             <div className='w-full h-screen pl-20'>
+                <ClientTopAvatar />
                 {children}
             </div>
         </>

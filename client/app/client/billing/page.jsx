@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import { CiSearch } from 'react-icons/ci'
 import { FaFileAlt } from 'react-icons/fa'
 import { IoClose, IoPauseSharp } from 'react-icons/io5'
@@ -37,14 +36,7 @@ const money = (value) => `\u20B9${value.toFixed(2)}`
 
 export default function BillingPage() {
   return (
-    <div className="relative min-h-screen w-full bg-[#E6FFFD] px-8 pb-12 pt-24 xl:px-14">
-      <Image
-        src="/svg/avatar.svg"
-        alt="User avatar"
-        width={60}
-        height={60}
-        className="absolute right-26 top-5 h-15 w-15 rounded-full object-cover"
-      />
+    <div className="relative min-h-screen w-full bg-[#E6FFFD] px-8 pb-12 pt-20 xl:px-14">
       <div className="mx-auto max-w-295">
         <div className="mb-6">
           <h1 className="text-4xl font-semibold text-[#2F2F2F]">Billing</h1>
