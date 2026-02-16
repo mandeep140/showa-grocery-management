@@ -10,9 +10,9 @@ import { formatInr, suppliers } from './data'
 
 const cardClass = 'rounded-xl border border-[#DCE8E7] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]'
 const primaryBtnClass =
-  'inline-flex h-10 items-center gap-2 rounded-lg bg-[#008C83] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#007A72]'
+  'inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#008C83] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#007A72] max-sm:w-full'
 const statCardClass =
-  'h-[119.1px] rounded-[10px] border-[0.8px] border-[#DCE8E7] bg-white pt-[24.8px] pr-[24.8px] pb-[0.8px] pl-[24.8px] shadow-[0_1px_2px_rgba(0,0,0,0.05)]'
+  'min-h-[110px] rounded-[10px] border border-[#DCE8E7] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] md:h-[119.1px] md:border-[0.8px] md:pt-[24.8px] md:pr-[24.8px] md:pb-[0.8px] md:pl-[24.8px]'
 
 const PurchaseSupplyPage = () => {
   const activeSuppliers = suppliers.filter((supplier) => supplier.status === 'Active').length
@@ -20,10 +20,10 @@ const PurchaseSupplyPage = () => {
 
   return (
     <div className='min-h-screen bg-[#E6FFFD] px-5 pb-10 pt-20 md:px-10 md:pb-12'>
-      <div className='mx-auto w-full max-w-245'>
+      <div className='mx-auto w-full max-w-[980px]'>
         <div className='mb-6 flex flex-wrap items-start justify-between gap-3'>
           <div>
-            <h1 className='text-4xl font-semibold text-[#2F2F2F]'>Suppliers</h1>
+            <h1 className='text-3xl font-semibold text-[#2F2F2F] sm:text-4xl'>Suppliers</h1>
             <p className='mt-2 text-sm text-[#7D8B8A]'>Manage supplier information and relationships</p>
           </div>
 
@@ -67,7 +67,7 @@ const PurchaseSupplyPage = () => {
 
           <div className={`${cardClass} overflow-hidden`}>
             <div className='overflow-x-auto'>
-              <table className='w-full min-w-205 text-left'>
+              <table className='w-full min-w-[820px] text-left'>
                 <thead className='bg-[#F5F5F5] text-xs uppercase tracking-wide text-[#748087]'>
                   <tr>
                     <th className='px-4 py-3 font-semibold'>Supplier Name</th>
@@ -140,7 +140,7 @@ const PurchaseSupplyPage = () => {
               </table>
             </div>
 
-            <div className='flex items-center justify-between border-t border-[#ECECEC] px-4 py-3 text-xs text-[#8b8f92]'>
+            <div className='flex flex-col items-start justify-between gap-3 border-t border-[#ECECEC] px-4 py-3 text-xs text-[#8b8f92] sm:flex-row sm:items-center'>
               <p>Showing 8 of 8 suppliers</p>
               <div className='flex items-center gap-1.5'>
                 <button type='button' className='rounded-lg border border-[#dfe3e6] bg-white px-3 py-1.5 text-[#8b8f92]'>

@@ -10,7 +10,7 @@ const inputClass =
 const AddSupplierPage = () => {
   return (
     <div className='min-h-screen bg-[#E6FFFD] px-5 pb-10 pt-20 md:px-10 md:pb-12'>
-      <div className='mx-auto w-full max-w-245'>
+      <div className='mx-auto w-full max-w-[980px]'>
         <Link
           href='/client/purchase-supply'
           className='inline-flex items-center gap-1 text-sm text-[#6f8082] transition-colors hover:text-[#4b5a5c]'
@@ -19,7 +19,7 @@ const AddSupplierPage = () => {
           Back to Suppliers
         </Link>
 
-        <h1 className='mt-2.5 text-4xl font-semibold text-[#2F2F2F]'>Add Supplier</h1>
+        <h1 className='mt-2.5 text-3xl font-semibold text-[#2F2F2F] sm:text-4xl'>Add Supplier</h1>
         <p className='mt-1.5 text-sm text-[#7D8B8A]'>Create a new supplier record</p>
 
         <div className='space-y-6'>
@@ -74,13 +74,13 @@ const AddSupplierPage = () => {
                 />
               </div>
 
-              <div className='flex items-center justify-between pt-3'>
-                <Link href='/client/purchase-supply' className='rounded-lg border border-[#DCDCDC] px-4 py-2 text-sm text-[#6f767a] transition-colors hover:bg-[#FAFAFA]'>
+              <div className='flex flex-col-reverse gap-2 pt-3 sm:flex-row sm:items-center sm:justify-between'>
+                <Link href='/client/purchase-supply' className='rounded-lg border border-[#DCDCDC] px-4 py-2 text-center text-sm text-[#6f767a] transition-colors hover:bg-[#FAFAFA] max-sm:w-full'>
                   Cancel
                 </Link>
                 <button
                   type='submit'
-                  className='inline-flex h-10 items-center rounded-lg bg-[#008C83] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#007A72]'
+                  className='inline-flex h-10 items-center justify-center rounded-lg bg-[#008C83] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#007A72] max-sm:w-full'
                 >
                   Create Supplier
                 </button>
