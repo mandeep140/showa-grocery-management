@@ -24,7 +24,7 @@ const SideNav = ({ children }) => {
             name: 'Inventory', path: '/client/inventory', icon: <FaBox />
         },
         {
-            name: 'Purchase & Supply', path: '/client/purchase-supply', icon: <IoCartSharp />
+            name: 'Purchase & Supply', path: '/client/purchase', icon: <IoCartSharp />
         },
         {
             name: 'Billing', path: '/client/billing', icon: <FaFileInvoiceDollar />

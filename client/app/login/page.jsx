@@ -1,7 +1,25 @@
-import React from 'react'
+'use client'
+import React, {useState} from 'react'
 import Image from 'next/image'
+import { login } from '@/util/apiService'
 
 const Login = () => {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+
+  const handleLogin = async (e) => {
+    e.preventDefault()
+    try {
+      const result = await login(username, password)
+      if (!result.success) {
+        setError(result.message || 'Login failed')
+      }
+    } catch (err) {
+      setError('An error occurred during login')
+    }
+  }
+
   return (
     <div className='w-full h-screen bg-[#E9FFF5] flex justify-center items-center'>
         <div className='h-full w-[50vw] flex justify-center items-center'>
@@ -22,7 +40,7 @@ const Login = () => {
             <h2 className='text-[#014D48] text-4xl font-extrabold'>Login to Account</h2>
             <p className='text-[#3E6D64] font-sm font-light'>Please enter your id and password to login into your account</p>
             </span>
-            <form>
+            <form onSubmit={handleLogin} className='flex flex-col gap-5'>
             <span className='flex flex-col gap-2'>
                 <label htmlFor="username">Username:</label>
                 <input type="text" name="username" id="username" placeholder='username@showa.online' required autoFocus className='bg-[#F1F4F9] px-4 w-[20vw] text-black py-2 rounded-md border-2 border-gray-300' />
