@@ -5,6 +5,7 @@ import { FaBox } from "react-icons/fa6"
 import { IoCartSharp } from "react-icons/io5"
 import { FaFileInvoiceDollar } from "react-icons/fa6";
 import { TbReport } from "react-icons/tb";
+import { FaWallet } from "react-icons/fa6";
 import Image from 'next/image'
 import { useState } from 'react'
 import Link from 'next/link'
@@ -29,6 +30,9 @@ const SideNav = ({ children }) => {
         },
         {
             name: 'Billing', path: '/client/billing', icon: <FaFileInvoiceDollar />
+        },
+        {
+            name: 'Credits', path: '/client/credits', icon: <FaWallet />
         },
         {
             name: 'Reports', path: '/client/reports', icon: <TbReport />
