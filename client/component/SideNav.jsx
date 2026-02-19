@@ -9,6 +9,7 @@ import { LuUserCog } from "react-icons/lu";
 import { HiMiniUserGroup } from "react-icons/hi2";
 import { BiPulse } from "react-icons/bi";
 import { RiTruckLine } from "react-icons/ri";
+import { FaWallet } from "react-icons/fa6";
 import Image from 'next/image'
 import { useState } from 'react'
 import Link from 'next/link'
@@ -31,6 +32,24 @@ const SideNav = ({ children }) => {
         { name: 'Customers', path: null, icon: <HiMiniUserGroup /> },
         { name: 'User Role', path: null, icon: <LuUserCog /> },
         { name: 'Activity Log', path: null, icon: <BiPulse /> },
+        {
+            name: 'Dashboard', path: '/client/dashboard', icon: <MdDashboard />
+        },
+        {
+            name: 'Inventory', path: '/client/inventory', icon: <FaBox />
+        },
+        {
+            name: 'Purchase & Supply', path: '/client/purchase-supply', icon: <IoCartSharp />
+        },
+        {
+            name: 'Billing', path: '/client/billing', icon: <FaFileInvoiceDollar />
+        },
+        {
+            name: 'Credits', path: '/client/credits', icon: <FaWallet />
+        },
+        {
+            name: 'Reports', path: '/client/reports', icon: <TbReport />
+        }
     ]
 
     return (
