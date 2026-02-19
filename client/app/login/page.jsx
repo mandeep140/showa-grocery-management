@@ -14,11 +14,16 @@ const Login = () => {
       const result = await login(username, password)
       if (!result.success) {
         setError(result.message || 'Login failed')
+      } else {
+        window.location.href = '/client/dashboard'
       }
     } catch (err) {
       setError('An error occurred during login')
     }
   }
+
+  const handleUsernameChange = (e) => setUsername(e.target.value)
+  const handlePasswordChange = (e) => setPassword(e.target.value)
 
   return (
     <div className='w-full h-screen bg-[#E9FFF5] flex justify-center items-center'>
@@ -38,16 +43,17 @@ const Login = () => {
         <div className='h-full w-[50vw] flex flex-col justify-center items-start pl-36 gap-10'>
             <span className='gap-3 flex flex-col'>
             <h2 className='text-[#014D48] text-4xl font-extrabold'>Login to Account</h2>
+            <p>{error && <span className='text-red-500'>{error}</span>}</p>
             <p className='text-[#3E6D64] font-sm font-light'>Please enter your id and password to login into your account</p>
             </span>
             <form onSubmit={handleLogin} className='flex flex-col gap-5'>
             <span className='flex flex-col gap-2'>
                 <label htmlFor="username">Username:</label>
-                <input type="text" name="username" id="username" placeholder='username@showa.online' required autoFocus className='bg-[#F1F4F9] px-4 w-[20vw] text-black py-2 rounded-md border-2 border-gray-300' />
+                <input type="text" name="username" id="username" placeholder='username@showa.online' required autoFocus className='bg-[#F1F4F9] px-4 w-[20vw] text-black py-2 rounded-md border-2 border-gray-300' onChange={handleUsernameChange} />
             </span>
             <span className='flex flex-col gap-2 mt-3'>
                 <label htmlFor="password">Password:</label>
-                <input type="password" name="password" id="password" placeholder='********' required className='bg-[#F1F4F9] px-4 w-[20vw] text-black py-2 rounded-md border-2 border-gray-300' />
+                <input type="password" name="password" id="password" placeholder='********' required className='bg-[#F1F4F9] px-4 w-[20vw] text-black py-2 rounded-md border-2 border-gray-300' onChange={handlePasswordChange} />
             </span>
             <button type="submit" className='bg-[#014D48] text-white px-4 w-[20vw] py-2 rounded-md font-semibold hover:bg-[#366055] transition-colors mt-5'>Login</button>
             </form>

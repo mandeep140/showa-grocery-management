@@ -9,6 +9,7 @@ import Image from 'next/image'
 import { useState } from 'react'
 import Link from 'next/link'
 import ClientTopAvatar from './ClientTopAvatar'
+import { logout } from '@/util/apiService'
 
 const SideNav = ({ children }) => {
     const pathname = usePathname();
@@ -57,6 +58,11 @@ const SideNav = ({ children }) => {
                         </Link>
                     ))}
                 </div>
+                {hovered && (
+                    <button onClick={() => logout()}
+                        className="w-full text-center py-2 text-white hover:bg-red-500/10 transition-colors duration-200"> Logout
+                    </button>
+                )}
                 <Image src='/svg/logo2.svg' alt="showa logo" width={60} height={60} className='mt-auto mx-auto mb-4' />
             </div>
             <div className='w-full h-screen pl-20'>

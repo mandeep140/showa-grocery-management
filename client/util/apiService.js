@@ -1,16 +1,5 @@
 'use client';
-
-// ============================================
-// API USAGE EXAMPLES
-// ============================================
-
 import api, { setAuthToken, loadAuthToken, getCurrentServerURL, reconnectToServer } from '../util/api';
-
-// ============================================
-// AUTHENTICATION
-// ============================================
-
-// Login
 export async function login(username, password) {
   try {
     const response = await api.post('/api/auth/login', {
@@ -19,7 +8,6 @@ export async function login(username, password) {
     });
     
     if (response.data.success) {
-      // Save token
       setAuthToken(response.data.token);
       return response.data;
     }
@@ -40,7 +28,6 @@ export async function login(username, password) {
   }
 }
 
-// Register
 export async function register(userData) {
   try {
     const response = await api.post('/api/auth/register', userData);
@@ -60,26 +47,19 @@ export async function register(userData) {
   }
 }
 
-// Logout
 export function logout() {
   setAuthToken(null);
+  window.location.href = '/login';
 }
 
-// ============================================
-// UTILITY FUNCTIONS
-// ============================================
-
-// Get current server URL
 export function getServerURL() {
   return getCurrentServerURL();
 }
 
-// Force reconnect to server
 export async function forceReconnect() {
   return await reconnectToServer();
 }
 
-// Check if logged in
 export function isAuthenticated() {
   return !!loadAuthToken();
 }

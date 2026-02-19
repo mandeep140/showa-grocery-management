@@ -15,6 +15,16 @@ const Add = () => {
             <div className='w-[70%] mx-auto rounded-xl bg-white p-6 '>
                 <form className='flex flex-col gap-6'>
                     <div className='flex flex-col items-center gap-4'>
+                        <p className='text-lg font-bold mb-4 mr-auto'>Product image</p>
+                        <div className='flex items-center justify-start w-full'>
+                            <div className='w-32 h-32 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-sm'>
+                                Preview
+                            </div>
+                            <button type='button' className='ml-6 px-4 py-2 rounded-lg text-[#008C83] border border-[#008C83] hover:bg-[#E6FFFD] duration-200'>Upload Image</button>
+                        </div>
+                    </div>
+
+                    <div className='flex flex-col gap-6'>
                         <p className='text-lg font-bold mb-4 mr-auto'>Basic information</p>
                         <span className='flex flex-col gap-2 w-full'>
                             <label htmlFor="productName" className='text-sm font-light'>Product Name*</label>

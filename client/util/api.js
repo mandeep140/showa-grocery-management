@@ -7,7 +7,6 @@ const SERVER_PORT = 24034;
 let currentServerURL = null;
 let isCheckingConnection = false;
 
-// Create axios instance
 const api = axios.create({
   timeout: 10000,
   headers: {
@@ -15,7 +14,6 @@ const api = axios.create({
   }
 });
 
-// Initialize server connection
 async function initializeServerConnection() {
   try {
     currentServerURL = await ensureServerConnection();
@@ -27,7 +25,6 @@ async function initializeServerConnection() {
   }
 }
 
-// Check server health
 async function checkServerHealth(baseURL) {
   try {
     const response = await axios.get(`${baseURL}/api/health`, {
@@ -39,18 +36,13 @@ async function checkServerHealth(baseURL) {
   }
 }
 
-// Request interceptor - verify connection before each request
 api.interceptors.request.use(
   async (config) => {
-    // Skip health check for health endpoint itself
     if (config.url?.includes('/api/health')) {
       return config;
     }
-
-    // If no base URL set, initialize connection
     if (!currentServerURL) {
       if (isCheckingConnection) {
-        // Wait for ongoing connection check
         await new Promise(resolve => setTimeout(resolve, 100));
         return config;
       }
@@ -66,8 +58,6 @@ api.interceptors.request.use(
       config.baseURL = currentServerURL;
       return config;
     }
-
-    // Verify existing connection
     const isHealthy = await checkServerHealth(currentServerURL);
     
     if (!isHealthy) {
@@ -76,17 +66,14 @@ api.interceptors.request.use(
       if (isCheckingConnection) {
         throw new Error('Server connection check in progress');
       }
-      
       isCheckingConnection = true;
-      
-      // Try to find server again
       const newIP = await findServerIP();
       
       if (newIP) {
         currentServerURL = `http://${newIP}:${SERVER_PORT}`;
         api.defaults.baseURL = currentServerURL;
         config.baseURL = currentServerURL;
-        console.log(`✅ Server reconnected at: ${newIP}`);
+        console.log(`Server reconnected at: ${newIP}`);
       } else {
         isCheckingConnection = false;
         throw new Error('Server not found on this network');
@@ -103,17 +90,14 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor - handle errors
 api.interceptors.response.use(
   (response) => {
     return response;
   },
   async (error) => {
-    // Network error - server might be down
     if (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK' || !error.response) {
       console.error('Network error - server might be down');
       
-      // Try to reconnect
       if (!isCheckingConnection) {
         isCheckingConnection = true;
         const newIP = await findServerIP();
@@ -123,7 +107,6 @@ api.interceptors.response.use(
           currentServerURL = `http://${newIP}:${SERVER_PORT}`;
           api.defaults.baseURL = currentServerURL;
           
-          // Retry the original request
           error.config.baseURL = currentServerURL;
           return api.request(error.config);
         }
@@ -140,20 +123,20 @@ api.interceptors.response.use(
   }
 );
 
-// Helper function to set auth token
 export function setAuthToken(token) {
   if (typeof window === 'undefined') return;
   
   if (token) {
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     localStorage.setItem('authToken', token);
+    document.cookie = `authToken=${token}; path=/; max-age=${60 * 60 * 100}; SameSite=Lax`;
   } else {
     delete api.defaults.headers.common['Authorization'];
     localStorage.removeItem('authToken');
+    document.cookie = 'authToken=; path=/; max-age=0';
   }
 }
 
-// Load auth token from localStorage
 export function loadAuthToken() {
   if (typeof window === 'undefined') return null;
   
@@ -164,27 +147,22 @@ export function loadAuthToken() {
   return token;
 }
 
-// Get current server URL
 export function getCurrentServerURL() {
   return currentServerURL;
 }
 
-// Force reconnect
 export async function reconnectToServer() {
   isCheckingConnection = false;
   currentServerURL = null;
   return await initializeServerConnection();
 }
 
-// Initialize on module load
 if (typeof window !== 'undefined') {
   (async () => {
     const savedURL = getServerURL();
     if (savedURL) {
       currentServerURL = savedURL;
       api.defaults.baseURL = savedURL;
-      
-      // Verify in background
       checkServerHealth(savedURL).then(isHealthy => {
         if (!isHealthy) {
           console.warn('Saved server IP not responding');
@@ -192,8 +170,6 @@ if (typeof window !== 'undefined') {
         }
       });
     }
-    
-    // Load auth token if exists
     loadAuthToken();
   })();
 }

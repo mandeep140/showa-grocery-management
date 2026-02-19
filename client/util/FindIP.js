@@ -4,15 +4,12 @@ const SERVER_PORT = 24034;
 const HEALTH_ENDPOINT = '/api/health';
 const STORAGE_KEY = 'serverConfig';
 
-// Get local IP range using WebRTC
 async function getLocalIPRange() {
-  // Return default if not in browser
   if (typeof window === 'undefined' || typeof RTCPeerConnection === 'undefined') {
     return '192.168.1';
   }
   
   try {
-    // Try to get local IP using WebRTC
     const pc = new RTCPeerConnection({
       iceServers: []
     });
@@ -26,7 +23,7 @@ async function getLocalIPRange() {
       pc.onicecandidate = (event) => {
         if (!event || !event.candidate) {
           pc.close();
-          resolve('192.168.1'); // Fallback
+          resolve('192.168.1'); 
           return;
         }
         
@@ -37,8 +34,6 @@ async function getLocalIPRange() {
         if (match) {
           const ip = match[0];
           const ipParts = ip.split('.');
-          
-          // Check if it's a private IP
           if (ipParts[0] === '192' || ipParts[0] === '10' || 
               (ipParts[0] === '172' && ipParts[1] >= 16 && ipParts[1] <= 31)) {
             pc.close();
@@ -46,24 +41,21 @@ async function getLocalIPRange() {
           }
         }
       };
-      
-      // Timeout after 2 seconds
       setTimeout(() => {
         pc.close();
-        resolve('192.168.1'); // Fallback
+        resolve('192.168.1'); 
       }, 2000);
     });
   } catch (error) {
     console.error('Error getting local IP:', error);
-    return '192.168.1'; // Fallback
+    return '192.168.1'; 
   }
 }
 
-// Check if server is running on specific IP
 async function checkServerHealth(ip) {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1000); // 1 second timeout
+    const timeout = setTimeout(() => controller.abort(), 1000); 
     
     const response = await fetch(`http://${ip}:${SERVER_PORT}${HEALTH_ENDPOINT}`, {
       signal: controller.signal,
@@ -82,20 +74,17 @@ async function checkServerHealth(ip) {
   }
 }
 
-// Scan network for server
 export async function findServerIP() {
-  console.log('🔍 Scanning network for server...');
+  console.log('Scanning network for server...');
   
   const baseIP = await getLocalIPRange();
   const promises = [];
-  
-  // Scan range 1-254
   for (let i = 1; i <= 254; i++) {
     const ip = `${baseIP}.${i}`;
     promises.push(
       checkServerHealth(ip).then(isHealthy => {
         if (isHealthy) {
-          console.log(`✅ Server found at: ${ip}:${SERVER_PORT}`);
+          console.log(`Server found at: ${ip}:${SERVER_PORT}`);
           return ip;
         }
         return null;
@@ -110,12 +99,11 @@ export async function findServerIP() {
     saveServerIP(serverIP);
     return serverIP;
   } else {
-    console.log('❌ Server not found on network');
+    console.log('Server not found on network');
     return null;
   }
 }
 
-// Save server IP to localStorage
 function saveServerIP(ip) {
   try {
     const config = {
@@ -127,14 +115,13 @@ function saveServerIP(ip) {
     
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-      console.log(`💾 Server IP saved: ${ip}`);
+      console.log(`Server IP saved: ${ip}`);
     }
   } catch (error) {
     console.error('Error saving server IP:', error.message);
   }
 }
 
-// Load server IP from localStorage
 export function loadServerIP() {
   try {
     if (typeof window !== 'undefined') {
@@ -150,13 +137,11 @@ export function loadServerIP() {
   return null;
 }
 
-// Get server URL
 export function getServerURL() {
   const ip = loadServerIP();
   return ip ? `http://${ip}:${SERVER_PORT}` : null;
 }
 
-// Verify current server IP is still valid
 export async function verifyServerIP() {
   const ip = loadServerIP();
   if (!ip) return false;
@@ -170,19 +155,16 @@ export async function verifyServerIP() {
   return true;
 }
 
-// Main function to get or find server IP
 export async function ensureServerConnection() {
-  // First check saved IP
   const savedIP = loadServerIP();
   if (savedIP) {
     const isValid = await checkServerHealth(savedIP);
     if (isValid) {
-      console.log(`✅ Using saved server IP: ${savedIP}`);
+      console.log(`Using saved server IP: ${savedIP}`);
       return `http://${savedIP}:${SERVER_PORT}`;
     }
   }
-  
-  // If saved IP doesn't work, scan network
+  k
   const foundIP = await findServerIP();
   if (foundIP) {
     return `http://${foundIP}:${SERVER_PORT}`;
