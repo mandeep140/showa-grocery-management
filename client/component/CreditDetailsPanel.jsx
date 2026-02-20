@@ -1,7 +1,7 @@
 'use client'
 
 import { FiArrowDownLeft, FiArrowUpRight, FiDownload, FiMapPin, FiPhone, FiUser } from 'react-icons/fi'
-import { getInitial } from '@/app/client/credits/credits-data'
+import { getInitial } from '@/app/client/debts/credits-data'
 
 const CreditDetailsPanel = ({ selectedCustomer, selectedTransactions, money, onReceivePayment }) => {
   return (

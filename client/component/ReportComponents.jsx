@@ -167,7 +167,7 @@ function DataRow({ type, row, pillStyles }) {
         <p className='font-medium'>{row.date}</p>
         <p className='text-xs text-[#9aa3a8]'>{row.time}</p>
       </td>
-      <td className='px-4 py-3.5 font-semibold'>{row.items}</td>
+      <td className='px-4 py-3.5 text-[#5f6a70]'>{row.items}</td>
       <td className='px-4 py-3.5'><StatusPill text={row.payment} pillStyles={pillStyles} /></td>
       <td className='px-4 py-3.5 text-right font-semibold'>{row.amount}</td>
     </tr>

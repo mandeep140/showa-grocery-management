@@ -44,45 +44,51 @@ api.interceptors.request.use(
     if (!currentServerURL) {
       if (isCheckingConnection) {
         await new Promise(resolve => setTimeout(resolve, 100));
-        return config;
-      }
-      
-      isCheckingConnection = true;
-      const connected = await initializeServerConnection();
-      isCheckingConnection = false;
-      
-      if (!connected) {
-        throw new Error('Server not found on this network');
+      } else {
+        isCheckingConnection = true;
+        const connected = await initializeServerConnection();
+        isCheckingConnection = false;
+        
+        if (!connected) {
+          throw new Error('Server not found on this network');
+        }
       }
       
       config.baseURL = currentServerURL;
-      return config;
-    }
-    const isHealthy = await checkServerHealth(currentServerURL);
+    } else {
+      const isHealthy = await checkServerHealth(currentServerURL);
     
-    if (!isHealthy) {
-      console.warn('⚠️ Server connection lost, searching for server...');
+      if (!isHealthy) {
+        console.warn('⚠️ Server connection lost, searching for server...');
       
-      if (isCheckingConnection) {
-        throw new Error('Server connection check in progress');
-      }
-      isCheckingConnection = true;
-      const newIP = await findServerIP();
+        if (isCheckingConnection) {
+          throw new Error('Server connection check in progress');
+        }
+        isCheckingConnection = true;
+        const newIP = await findServerIP();
       
-      if (newIP) {
-        currentServerURL = `http://${newIP}:${SERVER_PORT}`;
-        api.defaults.baseURL = currentServerURL;
-        config.baseURL = currentServerURL;
-        console.log(`Server reconnected at: ${newIP}`);
-      } else {
+        if (newIP) {
+          currentServerURL = `http://${newIP}:${SERVER_PORT}`;
+          api.defaults.baseURL = currentServerURL;
+          config.baseURL = currentServerURL;
+          console.log(`Server reconnected at: ${newIP}`);
+        } else {
+          isCheckingConnection = false;
+          throw new Error('Server not found on this network');
+        }
+      
         isCheckingConnection = false;
-        throw new Error('Server not found on this network');
       }
-      
-      isCheckingConnection = false;
-    }
     
-    config.baseURL = currentServerURL;
+      config.baseURL = currentServerURL;
+    }
+
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
+    }
     return config;
   },
   (error) => {

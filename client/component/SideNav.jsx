@@ -15,6 +15,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import ClientTopAvatar from './ClientTopAvatar'
 import { logout } from '@/util/apiService'
+import { IoSettings } from "react-icons/io5";
 
 const SideNav = ({ children }) => {
     const pathname = usePathname();
@@ -24,15 +25,6 @@ const SideNav = ({ children }) => {
     }
 
     const links = [
-        { name: 'Dashboard', path: '/client/dashboard', icon: <MdDashboard /> },
-        { name: 'Inventory', path: '/client/inventory', icon: <FaBox /> },
-        { name: 'Purch. & Supply', path: '/client/purchase-supply', icon: <IoCartSharp /> },
-        { name: 'Suppliers', path: null, icon: <RiTruckLine /> },
-        { name: 'Billing', path: '/client/billing', icon: <FaFileInvoiceDollar /> },
-        { name: 'Reports', path: '/client/reports', icon: <TbReport /> },
-        { name: 'Customers', path: null, icon: <HiMiniUserGroup /> },
-        { name: 'User Role', path: null, icon: <LuUserCog /> },
-        { name: 'Activity Log', path: null, icon: <BiPulse /> },
         {
             name: 'Dashboard', path: '/client/dashboard', icon: <MdDashboard />
         },
@@ -40,16 +32,23 @@ const SideNav = ({ children }) => {
             name: 'Inventory', path: '/client/inventory', icon: <FaBox />
         },
         {
-            name: 'Purchase & Supply', path: '/client/purchase', icon: <IoCartSharp />
+            name: 'Supplier', path: '/client/supplier', icon: <RiTruckLine />
+        },
+        {
+            name: 'Purchases', path: '/client/purchase', icon: <IoCartSharp />
         },
         {
             name: 'Billing', path: '/client/billing', icon: <FaFileInvoiceDollar />
         },
         {
-            name: 'Credits', path: '/client/credits', icon: <FaWallet />
+            name: 'Debts', path: '/client/debts', icon: <FaWallet />
         },
         {
             name: 'Reports', path: '/client/reports', icon: <TbReport />
+        },
+        { name: 'Customers', path: '/client/customer', icon: <HiMiniUserGroup /> },
+        {
+            name: 'Settings', path: '/client/settings', icon: <IoSettings />
         }
     ]
 
@@ -63,7 +62,7 @@ const SideNav = ({ children }) => {
                     <Image src="/image/store-logo.png" alt="Store Logo" width={60} height={60} />
                 </div>
 
-                <div className='flex flex-col w-full mt-5 gap-4'>
+                <div className='flex flex-col w-full mt-5 gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide'>
                     {links.map((link) => {
                         const isActive = Boolean(link.path && pathname.startsWith(link.path))
                         const commonClass = `w-full flex ${hovered ? 'flex-row gap-3 px-5' : 'flex-col px-0'} items-center ${hovered ? 'justify-start' : 'justify-center'} py-3.5 transition-all duration-300 ${isActive ? 'text-white' : 'text-white/55 hover:text-white'}`

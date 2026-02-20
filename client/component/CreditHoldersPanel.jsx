@@ -1,7 +1,7 @@
 'use client'
 
 import { CiSearch } from 'react-icons/ci'
-import { getAccent, getInitial } from '@/app/client/credits/credits-data'
+import { getAccent, getInitial } from '@/app/client/debts/credits-data'
 
 const CreditHoldersPanel = ({
   query,
