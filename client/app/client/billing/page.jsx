@@ -21,6 +21,7 @@ import {
   isPrinterConfigured,
   buildCartReceiptData,
   printReceipt,
+  checkPrinterConnected,
 } from '@/util/thermalPrinter'
 
 const CashIcon = () => (
@@ -73,6 +74,12 @@ const BillingPage = () => {
       return alert('Please select a real customer for partial/credit payment (not walk-in)')
     }
 
+    try {
+      await checkPrinterConnected()
+    } catch (printerErr) {
+      return alert(`Printer not connected: ${printerErr.message}\nBill was NOT created. Please connect the printer and try again, or use "Pay & Save" to save without printing.`)
+    }
+
     let buyerId = selectedCustomer?.id
     if (!buyerId) {
       try {
@@ -91,7 +98,6 @@ const BillingPage = () => {
 
     setPrinting(true)
     try {
-      // 1. Save order first
       const payload = {
         buyer_id: buyerId,
         location_id: selectedLocation,
@@ -116,7 +122,6 @@ const BillingPage = () => {
 
       const invoiceId = res.data.invoice_id
 
-      // 2. Print receipt with invoice number
       try {
         const settings = getPrinterSettings()
         const totalQty = cart.reduce((sum, item) => sum + item.quantity, 0)
@@ -139,7 +144,6 @@ const BillingPage = () => {
         alert(`Order saved (Invoice: ${invoiceId}) but printing failed: ${printErr.message}`)
       }
 
-      // 3. Show result and clear
       let msg = `Sale completed! Invoice: ${invoiceId}`
       if (res.data.advance_used > 0) msg += `\n₹${res.data.advance_used.toFixed(2)} deducted from advance balance`
       if (res.data.debt_cleared > 0) msg += `\n₹${res.data.debt_cleared.toFixed(2)} applied to clear existing debts`

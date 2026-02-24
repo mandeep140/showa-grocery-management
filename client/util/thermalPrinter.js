@@ -434,6 +434,31 @@ export async function connectWifiPrinter(ip, port = 9100) {
   return { success: true, name: settings.printerName }
 }
 
+export async function checkPrinterConnected() {
+  const settings = getPrinterSettings()
+
+  if (!settings.printerType) {
+    throw new Error('No printer configured. Go to Settings → Printer to set up.')
+  }
+
+  if (settings.printerType === 'bluetooth') {
+    if (!bluetoothCharacteristic && !bluetoothDevice) {
+      throw new Error('Bluetooth printer not connected. Please reconnect from Settings.')
+    }
+    return true
+  }
+
+  if (settings.printerType === 'wifi') {
+    const result = await testWifiConnection(settings.wifiIP, settings.wifiPort)
+    if (!result.success) {
+      throw new Error(result.message || 'WiFi printer not reachable. Check printer IP and make sure printer is ON.')
+    }
+    return true
+  }
+
+  throw new Error('Unknown printer type')
+}
+
 export async function printReceipt(receiptData) {
   const settings = getPrinterSettings()
 
