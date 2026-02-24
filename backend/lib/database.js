@@ -90,7 +90,7 @@ function initDatabase() {
         bulk_quantity INTEGER,
         bulk_price REAL,
         tax_percent REAL DEFAULT 0,
-        barcode TEXT UNIQUE,
+        barcode TEXT,
         img_path TEXT,
         description TEXT,
         is_active INTEGER DEFAULT 1,
@@ -125,6 +125,7 @@ function initDatabase() {
         phone TEXT,
         email TEXT,
         opening_balance REAL DEFAULT 0,
+        advance_balance REAL DEFAULT 0,
         notes TEXT,
         is_active INTEGER DEFAULT 1,
         created_at TEXT DEFAULT (datetime('now'))
@@ -460,6 +461,12 @@ function initDatabase() {
     db.run(`CREATE INDEX IF NOT EXISTS idx_products_name ON products(name)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id)`);
+
+    // Migration: Remove unique constraint on barcode (allow multiple products with same barcode)
+    db.run(`DROP INDEX IF EXISTS sqlite_autoindex_products_2`);
+
+    // Migration: Add advance_balance column to buyers table
+    db.run(`ALTER TABLE buyers ADD COLUMN advance_balance REAL DEFAULT 0`, () => {});
     db.run(`CREATE INDEX IF NOT EXISTS idx_batches_product_location ON batches(product_id, location_id)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_batches_expire ON batches(expire_date)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_batches_remaining ON batches(quantity_remaining)`);

@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { dbRun, dbGet, dbAll } = require('../lib/stockHelper');
-const { verifyToken } = require('../lib/authMiddleware');
+const { verifyToken, requirePermission } = require('../lib/authMiddleware');
 
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requirePermission('supplier_view'), async (req, res) => {
   try {
     const { search, is_active } = req.query;
     let sql = `SELECT s.*, COALESCE(SUM(p.final_amount), 0) as total_purchase_amount,
@@ -25,7 +25,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/:id', verifyToken, async (req, res) => {
+router.get('/:id', verifyToken, requirePermission('supplier_view'), async (req, res) => {
   try {
     const seller = await dbGet(`SELECT * FROM sellers WHERE id = ?`, [req.params.id]);
     if (!seller) return res.status(404).json({ success: false, message: 'Seller not found' });
@@ -70,7 +70,7 @@ router.get('/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, requirePermission('supplier_create'), async (req, res) => {
   try {
     const { name, company_name, address, phone, email, gst, opening_balance, notes } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
@@ -86,7 +86,7 @@ router.post('/', verifyToken, async (req, res) => {
   }
 });
 
-router.put('/:id', verifyToken, async (req, res) => {
+router.put('/:id', verifyToken, requirePermission('supplier_edit'), async (req, res) => {
   try {
     const { name, company_name, address, phone, email, gst, opening_balance, notes, is_active } = req.body;
     const seller = await dbGet(`SELECT * FROM sellers WHERE id = ?`, [req.params.id]);
@@ -114,7 +114,7 @@ router.put('/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.delete('/:id', verifyToken, async (req, res) => {
+router.delete('/:id', verifyToken, requirePermission('supplier_delete'), async (req, res) => {
   try {
     const pending = await dbGet(
       `SELECT COALESCE(SUM(final_amount - paid_amount), 0) as pending FROM purchases WHERE seller_id = ? AND payment_status != 'paid'`,
@@ -131,7 +131,7 @@ router.delete('/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/:id/purchases', verifyToken, async (req, res) => {
+router.get('/:id/purchases', verifyToken, requirePermission('supplier_view'), async (req, res) => {
   try {
     const { start_date, end_date, payment_status } = req.query;
     let sql = `SELECT p.*, l.name as location_name, u.name as created_by_name FROM purchases p
@@ -152,7 +152,7 @@ router.get('/:id/purchases', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/:id/payments', verifyToken, async (req, res) => {
+router.get('/:id/payments', verifyToken, requirePermission('supplier_view'), async (req, res) => {
   try {
     const payments = await dbAll(
       `SELECT sp.*, u.name as paid_by_name, p.invoice_number FROM seller_payments sp
@@ -176,7 +176,7 @@ router.get('/:id/payments', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/:id/pay', verifyToken, async (req, res) => {
+router.post('/:id/pay', verifyToken, requirePermission('supplier_edit'), async (req, res) => {
   try {
     const { amount, purchase_id, payment_method, payment_type, notes } = req.body;
     if (!amount || amount <= 0) return res.status(400).json({ success: false, message: 'Valid amount is required' });

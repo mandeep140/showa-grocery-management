@@ -7,38 +7,47 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState('sales');
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState(null);
-  const [dateRange, setDateRange] = useState({
-    startDate: '',
-    endDate: ''
-  });
+  const [summary, setSummary] = useState(null);
+  const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
 
   const handleGenerateReport = async () => {
     setLoading(true);
     setReportData(null);
+    setSummary(null);
 
     try {
       let response;
+      const params = {
+        start_date: dateRange.startDate || undefined,
+        end_date: dateRange.endDate || undefined,
+      };
+
       switch (activeTab) {
         case 'sales':
-          response = await api.get('/api/reports/sales', {
-            params: { startDate: dateRange.startDate, endDate: dateRange.endDate }
-          });
+          response = await api.get('/api/reports/sales', { params });
+          if (response.data.success) {
+            setReportData(response.data.orders || []);
+            setSummary(response.data.summary || null);
+          }
           break;
         case 'users':
-          response = await api.get('/api/reports/users', {
-            params: { startDate: dateRange.startDate, endDate: dateRange.endDate }
-          });
+          response = await api.get('/api/reports/users', { params });
+          if (response.data.success) {
+            setReportData(response.data.users || []);
+          }
           break;
         case 'inventory':
           response = await api.get('/api/reports/inventory');
+          if (response.data.success) {
+            setReportData(response.data.products || []);
+            setSummary(response.data.summary || null);
+          }
           break;
         default:
-          response = { data: { success: false } };
+          break;
       }
 
-      if (response.data.success) {
-        setReportData(response.data.data);
-      } else {
+      if (response && !response.data.success) {
         alert(response.data.message || 'Failed to generate report');
       }
     } catch (error) {
@@ -52,53 +61,57 @@ export default function ReportsPage() {
   const tabs = [
     { id: 'sales', name: 'Sales Report', icon: '💰' },
     { id: 'users', name: 'User Activity', icon: '👥' },
-    { id: 'inventory', name: 'Inventory Report', icon: '📦' }
+    { id: 'inventory', name: 'Inventory Report', icon: '📦' },
   ];
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR'
-    }).format(amount || 0);
-  };
+  const formatCurrency = (amount) =>
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount || 0);
 
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
     });
+  };
+
+  const stockStatusColor = (status) => {
+    if (status === 'in_stock') return 'bg-green-100 text-green-800';
+    if (status === 'low_stock') return 'bg-yellow-100 text-yellow-800';
+    return 'bg-red-100 text-red-800';
+  };
+
+  const stockStatusLabel = (status) => {
+    if (status === 'in_stock') return 'In Stock';
+    if (status === 'low_stock') return 'Low Stock';
+    return 'Out of Stock';
   };
 
   const exportToCSV = () => {
     if (!reportData) return;
-
     let csv = '';
     let filename = '';
 
     switch (activeTab) {
       case 'sales':
         filename = 'sales_report.csv';
-        csv = 'Order ID,Date,Customer,Amount,Payment Status,Created By\n';
-        reportData.forEach(item => {
-          csv += `${item.order_id},"${formatDate(item.order_date)}","${item.buyer_name}",${item.total_amount},"${item.payment_status}","${item.created_by}"\n`;
+        csv = 'Order ID,Date,Customer,Final Amount,Received,Payment Status,Created By\n';
+        reportData.forEach((item) => {
+          csv += `${item.id},"${formatDate(item.created_at)}","${item.buyer_name || 'Walk-in'}",${item.final_amount},${item.received_amount},"${item.payment_status}","${item.created_by_name || ''}"\n`;
         });
         break;
       case 'users':
         filename = 'user_activity_report.csv';
-        csv = 'User,Role,Last Login,Active Status,Total Orders\n';
-        reportData.forEach(item => {
-          csv += `"${item.name}","${item.role_name}","${formatDate(item.last_login)}","${item.is_active ? 'Active' : 'Inactive'}",${item.total_orders || 0}\n`;
+        csv = 'Name,Username,Role,Active,Total Orders,Total Sales,Purchases\n';
+        reportData.forEach((item) => {
+          csv += `"${item.name}","${item.username}","${item.role_name}","${item.is_active ? 'Yes' : 'No'}",${item.total_orders || 0},${item.total_sales || 0},${item.total_purchases || 0}\n`;
         });
         break;
       case 'inventory':
         filename = 'inventory_report.csv';
-        csv = 'Product,Category,Location,Stock,Reorder Level,Status\n';
-        reportData.forEach(item => {
-          csv += `"${item.product_name}","${item.category_name}","${item.location_name}",${item.stock_quantity},${item.reorder_level},"${item.stock_status}"\n`;
+        csv = 'Product,Code,Category,Brand,Stock,Selling Price,Stock Value,Status\n';
+        reportData.forEach((item) => {
+          csv += `"${item.name}","${item.product_code}","${item.category_name}","${item.brand_name}",${item.total_stock},${item.default_selling_price},${item.stock_value},"${item.stock_status}"\n`;
         });
         break;
     }
@@ -127,10 +140,7 @@ export default function ReportsPage() {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  setReportData(null);
-                }}
+                onClick={() => { setActiveTab(tab.id); setReportData(null); setSummary(null); }}
                 className={`py-4 px-6 text-sm font-medium border-b-2 transition ${
                   activeTab === tab.id
                     ? 'border-indigo-600 text-indigo-600'
@@ -212,6 +222,52 @@ export default function ReportsPage() {
         </div>
       </div>
 
+      {/* Summary Cards */}
+      {summary && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          {activeTab === 'sales' && (
+            <>
+              <div className="bg-white rounded-xl shadow-md p-4">
+                <p className="text-xs text-gray-500 uppercase font-medium">Total Orders</p>
+                <p className="text-2xl font-bold text-gray-800 mt-1">{summary.total_orders}</p>
+              </div>
+              <div className="bg-white rounded-xl shadow-md p-4">
+                <p className="text-xs text-gray-500 uppercase font-medium">Net Sales</p>
+                <p className="text-2xl font-bold text-green-600 mt-1">{formatCurrency(summary.total_sales)}</p>
+              </div>
+              <div className="bg-white rounded-xl shadow-md p-4">
+                <p className="text-xs text-gray-500 uppercase font-medium">Total Received</p>
+                <p className="text-2xl font-bold text-blue-600 mt-1">{formatCurrency(summary.total_received)}</p>
+              </div>
+              <div className="bg-white rounded-xl shadow-md p-4">
+                <p className="text-xs text-gray-500 uppercase font-medium">Total Profit</p>
+                <p className="text-2xl font-bold text-purple-600 mt-1">{formatCurrency(summary.total_profit)}</p>
+              </div>
+            </>
+          )}
+          {activeTab === 'inventory' && (
+            <>
+              <div className="bg-white rounded-xl shadow-md p-4">
+                <p className="text-xs text-gray-500 uppercase font-medium">Total Products</p>
+                <p className="text-2xl font-bold text-gray-800 mt-1">{summary.total_products}</p>
+              </div>
+              <div className="bg-white rounded-xl shadow-md p-4">
+                <p className="text-xs text-gray-500 uppercase font-medium">In Stock</p>
+                <p className="text-2xl font-bold text-green-600 mt-1">{summary.in_stock}</p>
+              </div>
+              <div className="bg-white rounded-xl shadow-md p-4">
+                <p className="text-xs text-gray-500 uppercase font-medium">Low Stock</p>
+                <p className="text-2xl font-bold text-yellow-600 mt-1">{summary.low_stock}</p>
+              </div>
+              <div className="bg-white rounded-xl shadow-md p-4">
+                <p className="text-xs text-gray-500 uppercase font-medium">Out of Stock</p>
+                <p className="text-2xl font-bold text-red-600 mt-1">{summary.out_of_stock}</p>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Report Data */}
       <div className="bg-white rounded-xl shadow-md p-6">
         {!reportData ? (
@@ -232,10 +288,11 @@ export default function ReportsPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Received</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created By</th>
                   </tr>
@@ -243,10 +300,11 @@ export default function ReportsPage() {
                 <tbody className="divide-y divide-gray-200">
                   {reportData.map((item, index) => (
                     <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">#{item.order_id}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(item.order_date)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.buyer_name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{formatCurrency(item.total_amount)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">#{item.id}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(item.created_at)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.buyer_name || 'Walk-in'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{formatCurrency(item.final_amount)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(item.received_amount)}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                           item.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
@@ -254,7 +312,7 @@ export default function ReportsPage() {
                           {item.payment_status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.created_by}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.created_by_name || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -265,23 +323,25 @@ export default function ReportsPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Login</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Orders</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Orders</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Sales</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purchases</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {reportData.map((item, index) => (
                     <tr key={index} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.name}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.username}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
                           {item.role_name}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(item.last_login)}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                           item.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
@@ -290,6 +350,8 @@ export default function ReportsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.total_orders || 0}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{formatCurrency(item.total_sales)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.total_purchases || 0}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -301,28 +363,26 @@ export default function ReportsPage() {
                 <thead className="bg-gray-50 border-b">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reorder Level</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sell Price</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock Value</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {reportData.map((item, index) => (
                     <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product_name}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.name}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.product_code}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.category_name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.location_name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.stock_quantity}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.reorder_level}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.total_stock} {item.unit}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(item.default_selling_price)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{formatCurrency(item.stock_value)}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          item.stock_status === 'In Stock' ? 'bg-green-100 text-green-800' :
-                          item.stock_status === 'Low Stock' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {item.stock_status}
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${stockStatusColor(item.stock_status)}`}>
+                          {stockStatusLabel(item.stock_status)}
                         </span>
                       </td>
                     </tr>

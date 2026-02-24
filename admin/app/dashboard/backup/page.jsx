@@ -91,8 +91,8 @@ export default function BackupPage() {
     const file = event.target.files[0];
     if (!file) return;
 
-    if (!file.name.endsWith('.db')) {
-      setMessage({ type: 'error', text: 'Please select a valid .db file' });
+    if (!file.name.endsWith('.zip')) {
+      setMessage({ type: 'error', text: 'Please select a valid .zip backup file' });
       return;
     }
 
@@ -174,7 +174,7 @@ export default function BackupPage() {
 
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            Create a backup of your database. The backup will be saved on the server.
+            Create a full backup of your database and images. The backup is saved as a <strong>.zip</strong> file containing both the database and all product images.
           </p>
 
           <div className="flex flex-wrap gap-3">
@@ -208,7 +208,7 @@ export default function BackupPage() {
               Upload Backup
               <input
                 type="file"
-                accept=".db"
+                accept=".zip"
                 onChange={handleUploadBackup}
                 className="hidden"
                 disabled={loading}

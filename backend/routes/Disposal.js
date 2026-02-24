@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { dbRun, dbGet, dbAll, logStockHistory } = require('../lib/stockHelper');
-const { verifyToken } = require('../lib/authMiddleware');
+const { verifyToken, requirePermission } = require('../lib/authMiddleware');
 
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requirePermission('inventory_view'), async (req, res) => {
   try {
     const { disposal_method, start_date, end_date } = req.query;
     let sql = `SELECT ep.*, p.name as product_name, p.product_code, l.name as location_name, b.batch_no, b.buying_rate, u.name as disposed_by_name
@@ -27,7 +27,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, requirePermission('inventory_delete'), async (req, res) => {
   try {
     const { batch_id, quantity, disposal_method, notes } = req.body;
 
@@ -80,7 +80,7 @@ router.post('/', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/bulk', verifyToken, async (req, res) => {
+router.post('/bulk', verifyToken, requirePermission('inventory_delete'), async (req, res) => {
   try {
     const { items, disposal_method, notes } = req.body;
     if (!items || !items.length) return res.status(400).json({ success: false, message: 'Items are required' });

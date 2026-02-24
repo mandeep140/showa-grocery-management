@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { HiMiniMagnifyingGlass, HiOutlineXMark } from 'react-icons/hi2'
 import { FiPhone, FiMapPin, FiFileText, FiPlus } from 'react-icons/fi'
 import { IoMdArrowBack } from 'react-icons/io'
@@ -13,17 +14,16 @@ export default function CustomerPage() {
   const [transactions, setTransactions] = useState([])
   const [debts, setDebts] = useState([])
   const [debtSummary, setDebtSummary] = useState(null)
+  const [debtPaymentsList, setDebtPaymentsList] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
 
-  // Payment modal
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [paymentSubmitting, setPaymentSubmitting] = useState(false)
 
-  // Add customer modal
   const [showAddModal, setShowAddModal] = useState(false)
   const [customerForm, setCustomerForm] = useState({ name: '', phone: '', address: '', email: '', notes: '' })
 
@@ -58,6 +58,9 @@ export default function CustomerPage() {
         setDebtSummary(debtsRes.data.summary)
       }
       if (ordersRes.data.success) setTransactions(ordersRes.data.orders)
+      if (detailRes.data.success && detailRes.data.customer.debt_payments) {
+        setDebtPaymentsList(detailRes.data.customer.debt_payments)
+      }
     } catch (err) {
       console.error('Failed to load customer detail:', err)
     } finally {
@@ -77,7 +80,6 @@ export default function CustomerPage() {
     c.phone?.includes(searchQuery)
   )
 
-  // --- Payment ---
   const openPaymentModal = () => {
     setPaymentAmount('')
     setPaymentMethod('cash')
@@ -111,7 +113,6 @@ export default function CustomerPage() {
     }
   }
 
-  // --- Add Customer ---
   const handleAddCustomer = async () => {
     if (!customerForm.name.trim()) return alert('Name is required')
     try {
@@ -134,16 +135,16 @@ export default function CustomerPage() {
   }
 
   const remainingBalance = customerDetail?.total_debt || 0
+  const advanceBalance = customerDetail?.advance_balance || 0
   const currentDueAmount = remainingBalance
 
   return (
     <div className="min-h-screen bg-[#E6FFFD] px-6 pb-6 pt-20">
       <div className="flex gap-5 items-start h-[calc(100vh-6rem)]">
-        {/* LEFT: Customer list */}
-        <div className="w-[280px] flex-shrink-0 flex flex-col bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden h-full">
+        <div className="w-70 shrink-0 flex flex-col bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden h-full">
           <div className="p-4 border-b border-gray-100">
             <div className="flex items-center justify-between mb-1">
-              <h2 className="text-base font-bold text-gray-800">Credit Holders</h2>
+              <h2 className="text-base font-bold text-gray-800">Customers</h2>
               <button
                 type="button"
                 onClick={() => setShowAddModal(true)}
@@ -156,7 +157,7 @@ export default function CustomerPage() {
               Total Outstanding <span className="font-semibold text-red-500">₹{totalOutstanding.toLocaleString()}</span>
             </p>
             <div className="flex items-center gap-2 rounded-lg border border-gray-200 px-2.5 py-2 bg-gray-50/50">
-              <HiMiniMagnifyingGlass className="h-4 w-4 text-gray-400 flex-shrink-0" />
+              <HiMiniMagnifyingGlass className="h-4 w-4 text-gray-400 shrink-0" />
               <input
                 type="text"
                 value={searchQuery}
@@ -194,7 +195,10 @@ export default function CustomerPage() {
                   {customer.total_debt > 0 && (
                     <span className="text-[12px] font-semibold text-red-500 flex-shrink-0">₹{customer.total_debt.toLocaleString()}</span>
                   )}
-                  {customer.total_debt === 0 && (
+                  {customer.total_debt === 0 && customer.advance_balance > 0 && (
+                    <span className="text-[11px] font-semibold text-blue-500 flex-shrink-0">+₹{customer.advance_balance.toLocaleString()}</span>
+                  )}
+                  {customer.total_debt === 0 && (!customer.advance_balance || customer.advance_balance <= 0) && (
                     <span className="text-[11px] text-green-500 flex-shrink-0">₹0</span>
                   )}
                 </button>
@@ -249,6 +253,9 @@ export default function CustomerPage() {
                       <p className={`text-2xl font-bold ${remainingBalance > 0 ? 'text-red-500' : 'text-green-500'}`}>
                         ₹{remainingBalance.toLocaleString()}
                       </p>
+                      {advanceBalance > 0 && (
+                        <p className="text-[12px] text-blue-500 font-semibold mt-0.5">Advance: ₹{advanceBalance.toLocaleString()}</p>
+                      )}
                     </div>
                     <div className="flex flex-col gap-2">
                       <button
@@ -264,7 +271,7 @@ export default function CustomerPage() {
                 </div>
 
                 {/* Stats row */}
-                <div className="grid grid-cols-4 gap-4 mt-5 pt-4 border-t border-gray-100">
+                <div className="grid grid-cols-5 gap-4 mt-5 pt-4 border-t border-gray-100">
                   <div>
                     <p className="text-[12px] text-gray-400">Total Orders</p>
                     <p className="text-lg font-bold text-gray-800">{customerDetail.stats?.total_orders || 0}</p>
@@ -281,6 +288,10 @@ export default function CustomerPage() {
                     <p className="text-[12px] text-gray-400">Outstanding</p>
                     <p className="text-lg font-bold text-red-500">₹{remainingBalance.toLocaleString()}</p>
                   </div>
+                  <div>
+                    <p className="text-[12px] text-gray-400">Advance</p>
+                    <p className="text-lg font-bold text-blue-500">₹{advanceBalance.toLocaleString()}</p>
+                  </div>
                 </div>
               </div>
 
@@ -295,44 +306,104 @@ export default function CustomerPage() {
                       <tr className="border-b border-gray-100 text-gray-400 text-[12px]">
                         <th className="text-left px-5 py-3 font-medium">Date</th>
                         <th className="text-left px-5 py-3 font-medium">Invoice</th>
-                        <th className="text-left px-5 py-3 font-medium">Description</th>
+                        <th className="text-left px-5 py-3 font-medium">Type</th>
                         <th className="text-right px-5 py-3 font-medium">Amount</th>
                         <th className="text-center px-5 py-3 font-medium">Status</th>
-                        <th className="text-right px-5 py-3 font-medium">Balance</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {transactions.length === 0 ? (
-                        <tr><td colSpan={6} className="px-5 py-8 text-center text-gray-400">No transactions yet</td></tr>
-                      ) : (
-                        transactions.map(order => (
-                          <tr key={order.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                            <td className="px-5 py-3 text-gray-500 whitespace-nowrap">{order.created_at?.split('T')[0] || order.created_at?.slice(0, 10)}</td>
-                            <td className="px-5 py-3 text-gray-700 font-medium">{order.invoice_id}</td>
-                            <td className="px-5 py-3 text-gray-500">
-                              {order.status === 'cancelled' ? 'Cancelled Order' : 'Purchase'}
+                      {(() => {
+                        // Merge orders and debt payments into unified timeline
+                        const timeline = []
+                        
+                        // Add orders
+                        transactions.forEach(order => {
+                          timeline.push({
+                            id: `order-${order.id}`,
+                            date: order.created_at,
+                            invoice: order.invoice_id,
+                            type: order.status === 'cancelled' ? 'Cancelled' : 'Purchase',
+                            amount: order.final_amount || 0,
+                            received: order.received_amount || 0,
+                            isDebit: true,
+                            status: order.status === 'cancelled' ? 'cancelled' : order.payment_status,
+                            isCancelled: order.status === 'cancelled'
+                          })
+                        })
+                        
+                        // Add debt payments
+                        debtPaymentsList.forEach(dp => {
+                          timeline.push({
+                            id: `payment-${dp.id}`,
+                            date: dp.created_at,
+                            invoice: dp.invoice_id || '—',
+                            type: dp.notes?.includes('Auto-applied') ? 'Auto Payment' : 'Debt Payment',
+                            amount: dp.amount || 0,
+                            isDebit: false,
+                            status: 'paid',
+                            paymentMethod: dp.payment_method,
+                            notes: dp.notes
+                          })
+                        })
+                        
+                        // Sort by date descending
+                        timeline.sort((a, b) => new Date(b.date) - new Date(a.date))
+                        
+                        if (timeline.length === 0) {
+                          return <tr><td colSpan={5} className="px-5 py-8 text-center text-gray-400">No transactions yet</td></tr>
+                        }
+                        
+                        // Calculate running balance
+                        let balance = 0
+                        const withBalance = [...timeline].reverse().map(t => {
+                          if (t.isCancelled) return { ...t, balance: balance }
+                          if (t.isDebit) {
+                            balance += (t.amount - t.received)
+                          } else {
+                            balance -= t.amount
+                          }
+                          return { ...t, balance }
+                        }).reverse()
+                        
+                        return withBalance.map(t => (
+                          <tr key={t.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                            <td className="px-5 py-3 text-gray-500 whitespace-nowrap text-[13px]">
+                              {t.date ? new Date(t.date + ' UTC').toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                            </td>
+                            <td className="px-5 py-3 text-gray-700 font-medium text-[13px]">
+                              {t.invoice && t.invoice !== '—'
+                                ? <Link href={`/client/invoice?q=${t.invoice}`} className="hover:underline hover:text-[#008C83]">{t.invoice}</Link>
+                                : t.invoice}
+                            </td>
+                            <td className="px-5 py-3">
+                              <span className={`inline-flex items-center gap-1 text-[12px] font-medium ${
+                                t.isDebit ? 'text-gray-600' : 'text-green-600'
+                              }`}>
+                                {t.isDebit ? '↑' : '↓'} {t.type}
+                              </span>
+                              {t.paymentMethod && <span className="text-[10px] text-gray-400 ml-1">({t.paymentMethod})</span>}
                             </td>
                             <td className="px-5 py-3 text-right">
-                              <span className={`font-semibold ${order.status === 'cancelled' ? 'text-gray-400 line-through' : 'text-red-500'}`}>
-                                ₹{(order.final_amount || 0).toLocaleString()}
+                              <span className={`font-semibold ${
+                                t.isCancelled ? 'text-gray-400 line-through' :
+                                t.isDebit ? 'text-red-500' : 'text-green-600'
+                              }`}>
+                                {t.isDebit ? '' : '+'}₹{t.amount.toLocaleString()}
                               </span>
                             </td>
                             <td className="px-5 py-3 text-center">
                               <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                                order.payment_status === 'paid' ? 'bg-green-50 text-green-600' :
-                                order.payment_status === 'partial' ? 'bg-orange-50 text-orange-600' :
-                                order.status === 'cancelled' ? 'bg-gray-100 text-gray-400' :
+                                t.status === 'paid' ? 'bg-green-50 text-green-600' :
+                                t.status === 'partial' ? 'bg-orange-50 text-orange-600' :
+                                t.status === 'cancelled' ? 'bg-gray-100 text-gray-400' :
                                 'bg-red-50 text-red-500'
                               }`}>
-                                {order.status === 'cancelled' ? 'Cancelled' : order.payment_status}
+                                {t.status}
                               </span>
-                            </td>
-                            <td className="px-5 py-3 text-right text-gray-700 font-medium">
-                              ₹{((order.final_amount || 0) - (order.received_amount || 0)).toLocaleString()}
                             </td>
                           </tr>
                         ))
-                      )}
+                      })()}
                     </tbody>
                   </table>
                 </div>
@@ -358,7 +429,9 @@ export default function CustomerPage() {
                       <tbody>
                         {debts.filter(d => d.status !== 'paid' && d.status !== 'cancelled').map(debt => (
                           <tr key={debt.id} className="border-b border-gray-50">
-                            <td className="px-5 py-3 font-medium text-gray-700">{debt.invoice_id}</td>
+                            <td className="px-5 py-3 font-medium text-gray-700">
+                              <Link href={`/client/invoice?q=${debt.invoice_id}`} className="hover:underline hover:text-[#008C83]">{debt.invoice_id}</Link>
+                            </td>
                             <td className="px-5 py-3 text-right text-gray-500">₹{(debt.total_amount || 0).toLocaleString()}</td>
                             <td className="px-5 py-3 text-right text-green-600">₹{(debt.paid_amount || 0).toLocaleString()}</td>
                             <td className="px-5 py-3 text-right font-semibold text-red-500">₹{(debt.amount_remaining || 0).toLocaleString()}</td>

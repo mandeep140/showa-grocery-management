@@ -5,7 +5,7 @@ const fs = require('fs');
 const multer = require('multer');
 const sharp = require('sharp');
 const { dbRun, dbGet, dbAll } = require('../lib/stockHelper');
-const { verifyToken } = require('../lib/authMiddleware');
+const { verifyToken, requirePermission } = require('../lib/authMiddleware');
 
 const IMAGES_DIR = path.join(__dirname, '../DATABASE/images');
 if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true });
@@ -20,7 +20,7 @@ const upload = multer({
   }
 });
 
-router.post('/upload-image', verifyToken, upload.single('image'), async (req, res) => {
+router.post('/upload-image', verifyToken, requirePermission(['inventory_create', 'inventory_edit']), upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No image uploaded' });
     const filename = `product_${Date.now()}.webp`;
@@ -54,7 +54,7 @@ router.get('/image/:filename', (req, res) => {
   res.sendFile(filePath);
 });
 
-router.delete('/image/:filename', verifyToken, (req, res) => {
+router.delete('/image/:filename', verifyToken, requirePermission('inventory_delete'), (req, res) => {
   try {
     const filePath = path.join(IMAGES_DIR, req.params.filename);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -64,7 +64,7 @@ router.delete('/image/:filename', verifyToken, (req, res) => {
   }
 });
 
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requirePermission(['inventory_view', 'billing', 'purchase_create']), async (req, res) => {
   try {
     const { category_id, brand_id, search, active, location_id } = req.query;
     let sql = `SELECT p.*, c.name as category_name, b.name as brand_name, 
@@ -112,7 +112,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/search', verifyToken, async (req, res) => {
+router.get('/search', verifyToken, requirePermission(['inventory_view', 'billing', 'purchase_create']), async (req, res) => {
   try {
     const { q } = req.query;
     if (!q) return res.json({ success: true, products: [] });
@@ -134,9 +134,9 @@ router.get('/search', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/barcode/:code', verifyToken, async (req, res) => {
+router.get('/barcode/:code', verifyToken, requirePermission(['inventory_view', 'billing']), async (req, res) => {
   try {
-    const row = await dbGet(
+    const rows = await dbAll(
       `SELECT p.*, c.name as category_name, b.name as brand_name,
         COALESCE(SUM(bt.quantity_remaining), 0) as total_stock
       FROM products p
@@ -147,14 +147,18 @@ router.get('/barcode/:code', verifyToken, async (req, res) => {
       GROUP BY p.id`,
       [req.params.code]
     );
-    if (!row) return res.status(404).json({ success: false, message: 'Product not found' });
-    res.json({ success: true, product: row });
+    if (!rows || rows.length === 0) return res.status(404).json({ success: false, message: 'Product not found' });
+    if (rows.length === 1) {
+      res.json({ success: true, product: rows[0] });
+    } else {
+      res.json({ success: true, products: rows, multiple: true });
+    }
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-router.get('/:id', verifyToken, async (req, res) => {
+router.get('/:id', verifyToken, requirePermission(['inventory_view', 'billing', 'purchase_create']), async (req, res) => {
   try {
     const product = await dbGet(
       `SELECT p.*, c.name as category_name, b.name as brand_name
@@ -194,7 +198,7 @@ router.get('/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, requirePermission('inventory_create'), async (req, res) => {
   try {
     const { product_code, name, unit, category_id, brand_id, default_buying_rate, default_selling_price, minimum_stock_level, bulk_quantity, bulk_price, tax_percent, barcode, img_path, description } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Product name is required' });
@@ -211,13 +215,12 @@ router.post('/', verifyToken, async (req, res) => {
   } catch (error) {
     if (error.message.includes('UNIQUE')) {
       if (error.message.includes('product_code')) return res.status(400).json({ success: false, message: 'Product code already exists' });
-      if (error.message.includes('barcode')) return res.status(400).json({ success: false, message: 'Barcode already exists' });
     }
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-router.put('/:id', verifyToken, async (req, res) => {
+router.put('/:id', verifyToken, requirePermission('inventory_edit'), async (req, res) => {
   try {
     const { product_code, name, unit, category_id, brand_id, default_buying_rate, default_selling_price, minimum_stock_level, bulk_quantity, bulk_price, tax_percent, barcode, img_path, description, is_active } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Product name is required' });
@@ -233,13 +236,12 @@ router.put('/:id', verifyToken, async (req, res) => {
   } catch (error) {
     if (error.message.includes('UNIQUE')) {
       if (error.message.includes('product_code')) return res.status(400).json({ success: false, message: 'Product code already exists' });
-      if (error.message.includes('barcode')) return res.status(400).json({ success: false, message: 'Barcode already exists' });
     }
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-router.delete('/:id', verifyToken, async (req, res) => {
+router.delete('/:id', verifyToken, requirePermission('inventory_delete'), async (req, res) => {
   try {
     const batches = await dbGet(`SELECT COUNT(*) as count FROM batches WHERE product_id = ? AND quantity_remaining > 0`, [req.params.id]);
     if (batches.count > 0) return res.status(400).json({ success: false, message: `Cannot delete. Product has ${batches.count} active batches with stock.` });

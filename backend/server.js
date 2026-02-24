@@ -21,7 +21,7 @@ const transfersRoutes = require('./routes/Transfers');
 const disposalRoutes = require('./routes/Disposal');
 const returnsRoutes = require('./routes/Returns');
 const historyRoutes = require('./routes/History');
-
+const printerRoutes = require('./routes/Printer');
 
 const port = 24034;
 
@@ -48,7 +48,7 @@ app.use('/api/transfers', transfersRoutes);
 app.use('/api/disposal', disposalRoutes);
 app.use('/api/returns', returnsRoutes);
 app.use('/api/history', historyRoutes);
-
+app.use('/api/printer', printerRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', code: 200, message: 'Server is healthy' });

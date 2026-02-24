@@ -65,8 +65,6 @@ const AddPurchase = () => {
     }
   }, [])
 
-  // --- Item helpers (all use functional state updates, no stale closures) ---
-
   const updateItem = useCallback((key, updates) => {
     setItems(prev => prev.map(item => item._key === key ? { ...item, ...updates } : item))
   }, [])
@@ -93,15 +91,12 @@ const AddPurchase = () => {
     })
   }, [updateItem])
 
-  // --- Product search (debounced, with AbortController per item) ---
-
   const doSearch = useCallback(async (query, itemKey) => {
     if (!query || query.length < 1) {
       updateItem(itemKey, { searchResults: [], showDropdown: false })
       return
     }
 
-    // Cancel any previous in-flight request for THIS item
     if (abortControllers.current[itemKey]) {
       abortControllers.current[itemKey].abort()
     }
@@ -113,7 +108,6 @@ const AddPurchase = () => {
         signal: controller.signal,
       })
       if (res.data.success) {
-        // If exactly 1 result AND the barcode matches exactly → auto-select (barcode scanner case)
         const products = res.data.products || []
         if (products.length === 1 && products[0].barcode && products[0].barcode === query) {
           selectProduct(itemKey, products[0])
@@ -131,12 +125,10 @@ const AddPurchase = () => {
   const handleSearchChange = useCallback((key, value) => {
     updateItem(key, { searchQuery: value, product_id: '', product_name: '' })
 
-    // Clear previous debounce for this item
     if (searchTimeouts.current[key]) clearTimeout(searchTimeouts.current[key])
     searchTimeouts.current[key] = setTimeout(() => doSearch(value, key), 350)
   }, [updateItem, doSearch])
 
-  // --- Calculations ---
 
   const calcItemTotal = (item) => {
     const qty = parseFloat(item.quantity) || 0
@@ -157,73 +149,59 @@ const AddPurchase = () => {
   const getGrandTotal = () =>
     getSubtotal() + getTaxTotal() - (parseFloat(formData.discount_amount) || 0)
 
-  // --- Submit (triple-guarded: submitting state + ref + disabled buttons) ---
-
   const handleSubmit = useCallback(async (isDraft = false) => {
-    if (submittedRef.current) return
+    if (submittedRef.current || submitting) return
     if (!formData.seller_id) return alert('Please select a supplier')
     if (!formData.invoice_number) return alert('Please enter invoice number')
     if (!formData.location_id) return alert('Please select a location')
     if (!formData.purchase_date) return alert('Please select purchase date')
 
-    setItems(currentItems => {
-      const validItems = currentItems.filter(item => item.product_id && item.quantity && item.buying_rate)
-      if (validItems.length === 0) {
-        alert('Please add at least one valid item')
-        return currentItems
+    const validItems = items.filter(item => item.product_id && item.quantity && item.buying_rate)
+    if (validItems.length === 0) return alert('Please add at least one valid item')
+
+    for (const item of validItems) {
+      if (item.expire_tracking && !item.expire_date) {
+        return alert(`Please set expiry date for ${item.product_name}`)
       }
-      for (const item of validItems) {
-        if (item.expire_tracking && !item.expire_date) {
-          alert(`Please set expiry date for ${item.product_name}`)
-          return currentItems
-        }
+    }
+
+    submittedRef.current = true
+    setSubmitting(true)
+
+    const payload = {
+      invoice_number: formData.invoice_number,
+      seller_id: formData.seller_id,
+      location_id: formData.location_id,
+      purchase_date: formData.purchase_date,
+      discount_amount: parseFloat(formData.discount_amount) || 0,
+      paid_amount: parseFloat(formData.paid_amount) || 0,
+      notes: formData.notes || null,
+      items: validItems.map(item => ({
+        product_id: item.product_id,
+        quantity: parseFloat(item.quantity),
+        buying_rate: parseFloat(item.buying_rate),
+        tax_percent: parseFloat(item.tax_percent) || 0,
+        expire_date: item.expire_tracking ? item.expire_date : null,
+      })),
+    }
+
+    try {
+      const res = await api.post('/api/purchases', payload)
+      if (res.data.success) {
+        alert('Purchase order created successfully!')
+        router.push('/client/purchase')
+      } else {
+        alert(res.data.message || 'Failed to create purchase order')
+        submittedRef.current = false
+        setSubmitting(false)
       }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to create purchase order')
+      submittedRef.current = false
+      setSubmitting(false)
+    }
+  }, [formData, items, router, submitting])
 
-      // --- Mark as submitted immediately (sync) ---
-      submittedRef.current = true
-      setSubmitting(true)
-
-      const payload = {
-        invoice_number: formData.invoice_number,
-        seller_id: formData.seller_id,
-        location_id: formData.location_id,
-        purchase_date: formData.purchase_date,
-        discount_amount: parseFloat(formData.discount_amount) || 0,
-        paid_amount: parseFloat(formData.paid_amount) || 0,
-        notes: formData.notes || null,
-        items: validItems.map(item => ({
-          product_id: item.product_id,
-          quantity: parseFloat(item.quantity),
-          buying_rate: parseFloat(item.buying_rate),
-          tax_percent: parseFloat(item.tax_percent) || 0,
-          expire_date: item.expire_tracking ? item.expire_date : null,
-        })),
-      }
-
-      // Fire the API call (outside the state updater)
-      setTimeout(async () => {
-        try {
-          const res = await api.post('/api/purchases', payload)
-          if (res.data.success) {
-            alert('Purchase order created successfully!')
-            router.push('/client/purchase')
-          } else {
-            alert(res.data.message || 'Failed to create purchase order')
-            submittedRef.current = false
-            setSubmitting(false)
-          }
-        } catch (err) {
-          alert(err.response?.data?.message || 'Failed to create purchase order')
-          submittedRef.current = false
-          setSubmitting(false)
-        }
-      }, 0)
-
-      return currentItems // don't change items
-    })
-  }, [formData, router])
-
-  // --- Prevent any Enter-key submission everywhere ---
   const blockEnter = useCallback((e) => {
     if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation() }
   }, [])

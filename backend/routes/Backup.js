@@ -3,10 +3,13 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
+const archiver = require('archiver');
+const unzipper = require('unzipper');
 const db = require('../lib/database');
 const { verifyToken, isAdmin } = require('../lib/authMiddleware');
 
 const BACKUP_DIR = path.join(__dirname, '../backups');
+const DATABASE_DIR = path.join(__dirname, '../DATABASE');
 const IMAGES_DIR = path.join(__dirname, '../DATABASE/images');
 
 if (!fs.existsSync(BACKUP_DIR)) {
@@ -24,17 +27,17 @@ const storage = multer.diskStorage({
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const ext = path.extname(file.originalname);
     const name = path.basename(file.originalname, ext);
-    cb(null, `${name}_${timestamp}${ext}`);
+    cb(null, `${name}_uploaded_${timestamp}${ext}`);
   }
 });
 
 const upload = multer({
   storage: storage,
   fileFilter: (req, file, cb) => {
-    if (file.originalname.endsWith('.db')) {
+    if (file.originalname.endsWith('.zip')) {
       cb(null, true);
     } else {
-      cb(new Error('Only .db files are allowed'));
+      cb(new Error('Only .zip backup files are allowed'));
     }
   }
 });
@@ -43,7 +46,7 @@ router.get('/', verifyToken, isAdmin, (req, res) => {
   try {
     const files = fs.readdirSync(BACKUP_DIR);
     const backups = files
-      .filter(file => file.endsWith('.db'))
+      .filter(file => file.endsWith('.zip'))
       .map(file => {
         const filePath = path.join(BACKUP_DIR, file);
         const stats = fs.statSync(filePath);
@@ -53,12 +56,9 @@ router.get('/', verifyToken, isAdmin, (req, res) => {
           date: stats.mtime
         };
       })
-      .sort((a, b) => b.date - a.date); 
-    
-    res.json({
-      success: true,
-      backups
-    });
+      .sort((a, b) => b.date - a.date);
+
+    res.json({ success: true, backups });
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -68,126 +68,110 @@ router.get('/', verifyToken, isAdmin, (req, res) => {
   }
 });
 
-router.post('/create', verifyToken, isAdmin, (req, res) => {
+router.post('/create', verifyToken, isAdmin, async (req, res) => {
   try {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const defaultFilename = `backup_${timestamp}.db`;
-    
-    const destinationPath = path.join(BACKUP_DIR, defaultFilename);
-    
-    const sourcePath = path.join(__dirname, '../DATABASE/showa_inventory_management.db');
-    
-    if (!fs.existsSync(sourcePath)) {
-      return res.status(404).json({
-        success: false,
-        message: 'Source database not found'
-      });
-    }
-    
-    fs.copyFileSync(sourcePath, destinationPath);
+    const zipFilename = `backup_${timestamp}.zip`;
+    const zipPath = path.join(BACKUP_DIR, zipFilename);
 
-    const backupImagesDir = path.join(BACKUP_DIR, `images_${timestamp}`);
-    if (fs.existsSync(IMAGES_DIR)) {
-      fs.mkdirSync(backupImagesDir, { recursive: true });
-      const imageFiles = fs.readdirSync(IMAGES_DIR);
-      for (const img of imageFiles) {
-        fs.copyFileSync(path.join(IMAGES_DIR, img), path.join(backupImagesDir, img));
-      }
+    if (!fs.existsSync(DATABASE_DIR)) {
+      return res.status(404).json({ success: false, message: 'DATABASE folder not found' });
     }
-    
+
+    await new Promise((resolve, reject) => {
+      const output = fs.createWriteStream(zipPath);
+      const archive = archiver('zip', { zlib: { level: 9 } });
+
+      output.on('close', resolve);
+      archive.on('error', reject);
+
+      archive.pipe(output);
+      // Add the entire DATABASE folder contents (db file + images/)
+      archive.directory(DATABASE_DIR, 'DATABASE');
+      archive.finalize();
+    });
+
+    const stats = fs.statSync(zipPath);
     res.json({
       success: true,
       message: 'Backup created successfully',
-      backupPath: destinationPath,
-      filename: path.basename(destinationPath)
+      filename: zipFilename,
+      size: stats.size
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error creating backup',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Error creating backup', error: error.message });
   }
 });
 
-router.post('/restore', verifyToken, isAdmin, (req, res) => {
+router.post('/restore', verifyToken, isAdmin, async (req, res) => {
   try {
     const { backupFile } = req.body;
-    
-    if (!backupFile) {
-      return res.status(400).json({
-        success: false,
-        message: 'Backup filename is required'
-      });
-    }
-    
-    let backupPath;
-    if (path.isAbsolute(backupFile)) {
-      backupPath = backupFile;
-    } else {
-      backupPath = path.join(BACKUP_DIR, backupFile);
-    }
-    
-    if (!fs.existsSync(backupPath)) {
-      return res.status(404).json({
-        success: false,
-        message: 'Backup file not found'
-      });
-    }
-    
-    const targetPath = path.join(__dirname, '../DATABASE/showa_inventory_management.db');
-    
-    const safetyBackupPath = path.join(BACKUP_DIR, `pre_restore_${new Date().toISOString().replace(/[:.]/g, '-')}.db`);
-    if (fs.existsSync(targetPath)) {
-      fs.copyFileSync(targetPath, safetyBackupPath);
-    }
-    
-    db.close((err) => {
-      if (err) {
-        console.error('Error closing database:', err);
-      }
-      
-      try {
-        fs.copyFileSync(backupPath, targetPath);
 
-        const backupBasename = path.basename(backupPath, '.db');
-        const backupTimestamp = backupBasename.replace('backup_', '');
-        const backupImagesDir = path.join(BACKUP_DIR, `images_${backupTimestamp}`);
-        if (fs.existsSync(backupImagesDir)) {
-          if (fs.existsSync(IMAGES_DIR)) {
-            const oldImages = fs.readdirSync(IMAGES_DIR);
-            for (const img of oldImages) {
-              fs.unlinkSync(path.join(IMAGES_DIR, img));
+    if (!backupFile) {
+      return res.status(400).json({ success: false, message: 'Backup filename is required' });
+    }
+
+    const backupPath = path.isAbsolute(backupFile)
+      ? backupFile
+      : path.join(BACKUP_DIR, backupFile);
+
+    if (!fs.existsSync(backupPath)) {
+      return res.status(404).json({ success: false, message: 'Backup file not found' });
+    }
+
+    // Create a safety backup of the current DATABASE before replacing
+    const safetyTimestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const safetyZipPath = path.join(BACKUP_DIR, `pre_restore_safety_${safetyTimestamp}.zip`);
+
+    await new Promise((resolve, reject) => {
+      const output = fs.createWriteStream(safetyZipPath);
+      const archive = archiver('zip', { zlib: { level: 6 } });
+      output.on('close', resolve);
+      archive.on('error', reject);
+      archive.pipe(output);
+      if (fs.existsSync(DATABASE_DIR)) {
+        archive.directory(DATABASE_DIR, 'DATABASE');
+      }
+      archive.finalize();
+    });
+
+    // Close DB connection, then restore
+    db.close(async (err) => {
+      if (err) console.error('Error closing database:', err);
+
+      try {
+        // Clear current DATABASE folder contents
+        const clearDir = (dirPath) => {
+          if (!fs.existsSync(dirPath)) return;
+          for (const entry of fs.readdirSync(dirPath)) {
+            const entryPath = path.join(dirPath, entry);
+            const stat = fs.statSync(entryPath);
+            if (stat.isDirectory()) {
+              clearDir(entryPath);
+              fs.rmdirSync(entryPath);
+            } else {
+              fs.unlinkSync(entryPath);
             }
-          } else {
-            fs.mkdirSync(IMAGES_DIR, { recursive: true });
           }
-          const restoreImages = fs.readdirSync(backupImagesDir);
-          for (const img of restoreImages) {
-            fs.copyFileSync(path.join(backupImagesDir, img), path.join(IMAGES_DIR, img));
-          }
-        }
-        
+        };
+        clearDir(DATABASE_DIR);
+
+        // Extract the zip into the parent of DATABASE (so DATABASE/ is recreated)
+        await fs.createReadStream(backupPath)
+          .pipe(unzipper.Extract({ path: path.dirname(DATABASE_DIR) }))
+          .promise();
+
         res.json({
           success: true,
           message: 'Database restored successfully. Please restart the server.',
-          safetyBackup: safetyBackupPath
+          safetyBackup: path.basename(safetyZipPath)
         });
-        
       } catch (error) {
-        res.status(500).json({
-          success: false,
-          message: 'Error restoring backup',
-          error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Error restoring backup', error: error.message });
       }
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error restoring backup',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Error restoring backup', error: error.message });
   }
 });
 

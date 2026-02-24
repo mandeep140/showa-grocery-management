@@ -1,0 +1,5 @@
+{
+  "watch": ["server.js", "routes/", "lib/"],
+  "ignore": ["DATABASE/", "backups/", "node_modules/", "*.db", "*.db-journal", "*.db-wal", "*.db-shm"],
+  "ext": "js,json"
+}

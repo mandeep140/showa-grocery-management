@@ -90,7 +90,7 @@ export default function DashboardLayout({ children }) {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading...</p>
@@ -100,65 +100,78 @@ export default function DashboardLayout({ children }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-100">
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full bg-white shadow-lg transition-all duration-300 ${
-          sidebarOpen ? 'w-64' : 'w-20'
+        className={`fixed top-0 left-0 h-full bg-gray-900 shadow-2xl transition-all duration-300 z-40 flex flex-col ${
+          sidebarOpen ? 'w-64' : 'w-16'
         }`}
       >
         {/* Logo */}
-        <div className="h-16 flex items-center justify-between px-4 border-b">
+        <div className={`h-16 flex items-center border-b border-gray-700 ${sidebarOpen ? 'px-4 justify-between' : 'px-3 justify-center'}`}>
           {sidebarOpen && (
-            <h1 className="text-xl font-bold text-indigo-600">Admin Panel</h1>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-sm font-bold text-white leading-tight">Showa Admin</h1>
+                <p className="text-xs text-gray-400">Management Panel</p>
+              </div>
+            </div>
           )}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-lg hover:bg-gray-100"
+            className={`p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition ${sidebarOpen ? '' : 'mx-auto'}`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sidebarOpen ? "M11 19l-7-7 7-7m8 14l-7-7 7-7" : "M4 6h16M4 12h16M4 18h16"} />
             </svg>
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="mt-6">
+        <nav className="flex-1 mt-4 px-2 space-y-1 overflow-y-auto">
           {menuItems.map((item) => {
             const isActive = pathname === item.path;
             return (
               <Link
                 key={item.path}
                 href={item.path}
-                className={`flex items-center px-4 py-3 mx-2 rounded-lg transition ${
+                title={!sidebarOpen ? item.name : ''}
+                className={`flex items-center rounded-lg transition-all duration-150 group ${
+                  sidebarOpen ? 'px-3 py-2.5' : 'p-2.5 justify-center'
+                } ${
                   isActive
-                    ? 'bg-indigo-50 text-indigo-600'
-                    : 'text-gray-700 hover:bg-gray-100'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/50'
+                    : 'text-gray-400 hover:bg-gray-800 hover:text-white'
                 }`}
               >
                 <span className="flex-shrink-0">{item.icon}</span>
-                {sidebarOpen && <span className="ml-3">{item.name}</span>}
+                {sidebarOpen && <span className="ml-3 text-sm font-medium">{item.name}</span>}
               </Link>
             );
           })}
         </nav>
 
         {/* User Info & Logout */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
+        <div className="p-3 border-t border-gray-700">
           {sidebarOpen ? (
-            <div className="space-y-3">
-              <div className="flex items-center">
-                <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-semibold">
+            <div className="space-y-2">
+              <div className="flex items-center px-2 py-1.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                   {user.name.charAt(0).toUpperCase()}
                 </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                  <p className="text-xs text-gray-500">{user.role_name}</p>
+                <div className="ml-2 min-w-0">
+                  <p className="text-sm font-medium text-white truncate">{user.name}</p>
+                  <p className="text-xs text-gray-400 truncate">{user.role_name}</p>
                 </div>
               </div>
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center justify-center px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition"
+                className="w-full flex items-center justify-center px-3 py-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 hover:text-red-300 transition text-sm font-medium"
               >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -169,7 +182,8 @@ export default function DashboardLayout({ children }) {
           ) : (
             <button
               onClick={handleLogout}
-              className="w-full p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+              title="Logout"
+              className="w-full p-2 text-red-400 hover:bg-red-500/20 hover:text-red-300 rounded-lg transition flex items-center justify-center"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -181,29 +195,37 @@ export default function DashboardLayout({ children }) {
 
       {/* Main Content */}
       <main
-        className={`transition-all duration-300 ${
-          sidebarOpen ? 'ml-64' : 'ml-20'
+        className={`transition-all duration-300 min-h-screen flex flex-col ${
+          sidebarOpen ? 'ml-64' : 'ml-16'
         }`}
       >
         {/* Top Bar */}
-        <header className="bg-white shadow-sm h-16 flex items-center justify-between px-6">
-          <h2 className="text-xl font-semibold text-gray-800">
-            {menuItems.find((item) => item.path === pathname)?.name || 'Dashboard'}
-          </h2>
+        <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 sticky top-0 z-30 shadow-sm">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-gray-800">
+              {menuItems.find((item) => item.path === pathname)?.name || 'Dashboard'}
+            </h2>
+          </div>
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600">
-              {new Date().toLocaleDateString('en-US', {
-                weekday: 'long',
+            <span className="text-sm text-gray-500 hidden md:block">
+              {new Date().toLocaleDateString('en-IN', {
+                weekday: 'short',
                 year: 'numeric',
-                month: 'long',
+                month: 'short',
                 day: 'numeric'
               })}
             </span>
+            <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1.5">
+              <div className="w-6 h-6 rounded bg-indigo-500 flex items-center justify-center text-white text-xs font-bold">
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+              <span className="text-sm font-medium text-gray-700 hidden md:block">{user.name}</span>
+            </div>
           </div>
         </header>
 
         {/* Page Content */}
-        <div className="p-6">{children}</div>
+        <div className="flex-1 p-6">{children}</div>
       </main>
     </div>
   );

@@ -97,3 +97,12 @@ export function LossReportIcon() {
     </svg>
   )
 }
+
+export function ReturnsReportIcon() {
+  return (
+    <svg width='18' height='18' viewBox='0 0 18 18' fill='none' xmlns='http://www.w3.org/2000/svg' aria-hidden='true'>
+      <path d='M6.75 3.75L3 7.5L6.75 11.25' stroke='currentColor' strokeWidth='1.5' strokeLinecap='round' strokeLinejoin='round' />
+      <path d='M3 7.5H12C12.7956 7.5 13.5587 7.81607 14.1213 8.37868C14.6839 8.94129 15 9.70435 15 10.5C15 11.2956 14.6839 12.0587 14.1213 12.6213C13.5587 13.1839 12.7956 13.5 12 13.5H10.5' stroke='currentColor' strokeWidth='1.5' strokeLinecap='round' strokeLinejoin='round' />
+    </svg>
+  )
+}

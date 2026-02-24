@@ -224,7 +224,7 @@ const View = () => {
                 <tbody>
                   {seller.recent_payments.map((payment, index) => (
                     <tr key={index} className='border-b border-gray-100 hover:bg-gray-50'>
-                      <td className='p-4 text-sm text-gray-500'>{new Date(payment.created_at).toLocaleDateString('en-IN')}</td>
+                      <td className='p-4 text-sm text-gray-500'>{new Date(payment.created_at + ' UTC').toLocaleDateString('en-IN')}</td>
                       <td className='p-4 text-sm'>{payment.invoice_number || 'General'}</td>
                       <td className='p-4 text-green-700 font-medium'>₹{(payment.amount || 0).toLocaleString('en-IN')}</td>
                       <td className='p-4 text-sm capitalize'>{payment.payment_method || 'cash'}</td>

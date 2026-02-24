@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { tabs, pillStyles, money, buildSalesContent, buildInventoryContent, buildPurchaseContent, buildLossContent } from './report-config'
+import { tabs, pillStyles, money, buildSalesContent, buildInventoryContent, buildPurchaseContent, buildLossContent, buildReturnsContent } from './report-config'
 import { SummaryCards, TabsCard, ReportTable } from '@/component/ReportComponents'
 import { FiCalendar } from 'react-icons/fi'
 import api from '@/util/api'
@@ -90,6 +90,16 @@ export default function ReportsPage() {
           }
           break
         }
+        case 'returns': {
+          const params = new URLSearchParams()
+          if (range.start_date) params.set('start_date', range.start_date)
+          if (range.end_date) params.set('end_date', range.end_date)
+          const res = await api.get(`/api/reports/returns?${params}`)
+          if (res.data.success) {
+            setContent(buildReturnsContent(res.data.returns || [], res.data.summary))
+          }
+          break
+        }
       }
     } catch (err) { console.error(err) }
     finally { setLoading(false) }
@@ -105,13 +115,11 @@ export default function ReportsPage() {
 
   return (
     <div className="min-h-screen bg-[#E6FFFD] px-6 pb-10 pt-20 md:px-10">
-      <div className="mx-auto w-full max-w-[1100px]">
+      <div className="mx-auto w-full max-w-275">
         <header className="mb-6">
           <h1 className="text-2xl font-bold text-gray-800">Reports</h1>
           <p className="mt-1 text-sm text-gray-400">View business reports and analytics</p>
         </header>
-
-        {/* Date Range */}
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <p className="flex items-center gap-2 text-xs font-semibold text-gray-500 mb-3">
             <FiCalendar className="h-3.5 w-3.5 text-[#008C83]" /> Date Range
@@ -151,10 +159,7 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {/* Tabs */}
         <TabsCard tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />
-
-        {/* Content */}
         {loading ? (
           <div className="mt-6 text-center py-12 text-sm text-gray-400">Loading report...</div>
         ) : content ? (

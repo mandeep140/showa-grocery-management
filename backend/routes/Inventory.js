@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { dbRun, dbGet, dbAll } = require('../lib/stockHelper');
-const { verifyToken } = require('../lib/authMiddleware');
+const { verifyToken, requirePermission } = require('../lib/authMiddleware');
 
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requirePermission('inventory_view'), async (req, res) => {
   try {
     const { location_id } = req.query;
     let sql = `SELECT p.id as product_id, p.product_code, p.name as product_name, p.unit,
@@ -34,7 +34,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/low-stock', verifyToken, async (req, res) => {
+router.get('/low-stock', verifyToken, requirePermission('inventory_view'), async (req, res) => {
   try {
     const rows = await dbAll(
       `SELECT p.id as product_id, p.product_code, p.name as product_name, p.unit,
@@ -52,7 +52,7 @@ router.get('/low-stock', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/expiring', verifyToken, async (req, res) => {
+router.get('/expiring', verifyToken, requirePermission('inventory_view'), async (req, res) => {
   try {
     const days = parseInt(req.query.days) || 30;
     const rows = await dbAll(
@@ -75,7 +75,7 @@ router.get('/expiring', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/expired', verifyToken, async (req, res) => {
+router.get('/expired', verifyToken, requirePermission('inventory_view'), async (req, res) => {
   try {
     const rows = await dbAll(
       `SELECT b.id as batch_id, b.batch_no, b.quantity_remaining, b.expire_date, b.buying_rate,
@@ -95,7 +95,7 @@ router.get('/expired', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/product/:productId', verifyToken, async (req, res) => {
+router.get('/product/:productId', verifyToken, requirePermission('inventory_view'), async (req, res) => {
   try {
     const { location_id } = req.query;
     let sql = `SELECT b.*, l.name as location_name, p.name as product_name
@@ -118,7 +118,7 @@ router.get('/product/:productId', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/batch/:batchId', verifyToken, async (req, res) => {
+router.get('/batch/:batchId', verifyToken, requirePermission('inventory_view'), async (req, res) => {
   try {
     const row = await dbGet(
       `SELECT b.*, l.name as location_name, p.name as product_name, p.product_code

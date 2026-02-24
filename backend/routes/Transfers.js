@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { dbRun, dbGet, dbAll, logStockHistory, generateId } = require('../lib/stockHelper');
-const { verifyToken } = require('../lib/authMiddleware');
+const { verifyToken, requirePermission } = require('../lib/authMiddleware');
 
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requirePermission('inventory_view'), async (req, res) => {
   try {
     const transfers = await dbAll(
       `SELECT st.*, l1.name as from_location_name, l2.name as to_location_name, u.name as transferred_by_name,
@@ -20,7 +20,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/:id', verifyToken, async (req, res) => {
+router.get('/:id', verifyToken, requirePermission('inventory_view'), async (req, res) => {
   try {
     const transfer = await dbGet(
       `SELECT st.*, l1.name as from_location_name, l2.name as to_location_name, u.name as transferred_by_name
@@ -50,7 +50,7 @@ router.get('/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, requirePermission('inventory_edit'), async (req, res) => {
   try {
     const { from_location_id, to_location_id, transfer_date, notes, items } = req.body;
 

@@ -5,9 +5,11 @@ import { VscDebugRestart } from 'react-icons/vsc'
 import { FaBox, FaFileAlt } from 'react-icons/fa'
 import { HiMiniMagnifyingGlass } from 'react-icons/hi2'
 import { IoClose } from 'react-icons/io5'
+import { MdQrCodeScanner } from 'react-icons/md'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import api from '@/util/api'
+import BarcodeScanner from '@/component/BarcodeScanner'
 
 const Return = () => {
   const router = useRouter()
@@ -20,15 +22,18 @@ const Return = () => {
   const [reason, setReason] = useState('')
 
   // Customer return state
+  const [returnItems, setReturnItems] = useState([])
+  const [cProductSearch, setCProductSearch] = useState('')
+  const [cProductResults, setCProductResults] = useState([])
+  const [cShowProductDropdown, setCShowProductDropdown] = useState(false)
+  const [showScanner, setShowScanner] = useState(false)
   const [customers, setCustomers] = useState([])
   const [customerSearch, setCustomerSearch] = useState('')
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState(null)
-  const [orders, setOrders] = useState([])
-  const [selectedOrder, setSelectedOrder] = useState(null)
-  const [orderDetails, setOrderDetails] = useState(null)
-  const [customerItems, setCustomerItems] = useState([]) // [{product_id, batch_id, quantity, selling_price, product_name, max_qty}]
+  const [customerDebtInfo, setCustomerDebtInfo] = useState(null)
   const [refundMethod, setRefundMethod] = useState('cash')
+  const cProductSearchTimeout = useRef(null)
   const customerSearchTimeout = useRef(null)
 
   // Seller return state
@@ -58,7 +63,70 @@ const Return = () => {
     loadLocations()
   }, [])
 
-  // --- Customer Search ---
+  // --- Customer Return: Product Search ---
+  const searchCProducts = async (query) => {
+    if (!query.trim()) return setCProductResults([])
+    try {
+      const res = await api.get(`/api/products?search=${encodeURIComponent(query)}`)
+      if (res.data.success) setCProductResults(res.data.products)
+    } catch (err) { console.error(err) }
+  }
+
+  const handleCProductSearch = (value) => {
+    setCProductSearch(value)
+    setCShowProductDropdown(true)
+    if (cProductSearchTimeout.current) clearTimeout(cProductSearchTimeout.current)
+    cProductSearchTimeout.current = setTimeout(() => searchCProducts(value), 300)
+  }
+
+  const addReturnItem = (product) => {
+    if (returnItems.find(i => i.product_id === product.id)) {
+      setReturnItems(prev => prev.map(i => i.product_id === product.id ? { ...i, quantity: i.quantity + 1 } : i))
+    } else {
+      setReturnItems(prev => [...prev, {
+        product_id: product.id,
+        product_name: product.name,
+        quantity: 1,
+        selling_price: product.default_selling_price || 0,
+        unit: product.unit || 'pcs',
+      }])
+    }
+    setCProductSearch('')
+    setCProductResults([])
+    setCShowProductDropdown(false)
+  }
+
+  const handleBarcodeScan = async (barcode) => {
+    setShowScanner(false)
+    try {
+      const res = await api.get(`/api/products/barcode/${encodeURIComponent(barcode)}`)
+      if (res.data.success && res.data.products && res.data.products.length > 0) {
+        if (res.data.products.length === 1) {
+          addReturnItem(res.data.products[0])
+        } else {
+          setCProductResults(res.data.products)
+          setCShowProductDropdown(true)
+          setCProductSearch(barcode)
+        }
+      } else {
+        alert('No product found for this barcode')
+      }
+    } catch (err) { alert('Error looking up barcode') }
+  }
+
+  const updateReturnItemQty = (index, qty) => {
+    setReturnItems(prev => prev.map((item, i) => i === index ? { ...item, quantity: Math.max(1, Number(qty) || 1) } : item))
+  }
+
+  const updateReturnItemPrice = (index, price) => {
+    setReturnItems(prev => prev.map((item, i) => i === index ? { ...item, selling_price: Number(price) || 0 } : item))
+  }
+
+  const removeReturnItem = (index) => {
+    setReturnItems(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // --- Customer Search (optional for returns) ---
   const searchCustomers = async (query) => {
     if (!query.trim()) return setCustomers([])
     try {
@@ -79,60 +147,21 @@ const Return = () => {
     setCustomerSearch(customer.name)
     setShowCustomerDropdown(false)
     setCustomers([])
-    setSelectedOrder(null)
-    setOrderDetails(null)
-    setCustomerItems([])
-
-    // Load orders for this customer
     try {
-      const res = await api.get(`/api/orders?buyer_id=${customer.id}`)
-      if (res.data.success) setOrders(res.data.orders)
-    } catch (err) { console.error(err) }
-  }
-
-  const selectOrder = async (orderId) => {
-    if (!orderId) {
-      setSelectedOrder(null)
-      setOrderDetails(null)
-      setCustomerItems([])
-      return
-    }
-    setSelectedOrder(orderId)
-    try {
-      const res = await api.get(`/api/orders/${orderId}`)
+      const res = await api.get(`/api/customers/${customer.id}`)
       if (res.data.success) {
-        setOrderDetails(res.data.order)
-        // Pre-populate items from order
-        const items = []
-        for (const item of res.data.order.items) {
-          if (item.batches && item.batches.length > 0) {
-            items.push({
-              product_id: item.product_id,
-              product_name: item.product_name,
-              batch_id: item.batches[0].batch_id,
-              batch_no: item.batches[0].batch_no,
-              selling_price: item.selling_price,
-              quantity: 0,
-              max_qty: item.total_quantity,
-              selected: false,
-            })
-          }
-        }
-        setCustomerItems(items)
+        const info = { total_debt: res.data.customer.total_debt || 0, advance_balance: res.data.customer.advance_balance || 0 }
+        setCustomerDebtInfo(info)
+        setRefundMethod(info.total_debt > 0 ? 'debt_reduce' : 'advance')
       }
     } catch (err) { console.error(err) }
   }
 
-  const toggleCustomerItem = (index) => {
-    setCustomerItems(prev => prev.map((item, i) =>
-      i === index ? { ...item, selected: !item.selected, quantity: item.selected ? 0 : 1 } : item
-    ))
-  }
-
-  const updateCustomerItemQty = (index, qty) => {
-    setCustomerItems(prev => prev.map((item, i) =>
-      i === index ? { ...item, quantity: Math.min(Number(qty), item.max_qty) } : item
-    ))
+  const clearCustomer = () => {
+    setSelectedCustomer(null)
+    setCustomerSearch('')
+    setCustomerDebtInfo(null)
+    setRefundMethod('cash')
   }
 
   // --- Seller Search ---
@@ -227,28 +256,29 @@ const Return = () => {
   // --- Submit ---
   const handleCustomerReturn = async () => {
     if (submitting) return
-    const selected = customerItems.filter(i => i.selected && i.quantity > 0)
-    if (!selectedCustomer) return alert('Select a customer')
     if (!selectedLocation) return alert('Select a location')
-    if (selected.length === 0) return alert('Select at least one item to return')
+    if (returnItems.length === 0) return alert('Add at least one product to return')
 
     setSubmitting(true)
     try {
-      const res = await api.post('/api/returns/customer', {
-        order_id: selectedOrder || null,
-        buyer_id: selectedCustomer.id,
+      const payload = {
         location_id: Number(selectedLocation),
-        refund_method: refundMethod,
+        refund_method: selectedCustomer ? refundMethod : 'cash',
         reason: reason || null,
-        items: selected.map(i => ({
+        items: returnItems.map(i => ({
           product_id: i.product_id,
-          batch_id: i.batch_id,
           quantity: i.quantity,
           selling_price: i.selling_price,
         })),
-      })
+      }
+      if (selectedCustomer) payload.buyer_id = selectedCustomer.id
+
+      const res = await api.post('/api/returns/customer', payload)
       if (res.data.success) {
-        alert(`Customer return processed: ${res.data.return_number}`)
+        let msg = `Return processed: ${res.data.return_number}\nRefund: ₹${res.data.total_refund}`
+        if (res.data.debt_cleared > 0) msg += `\nDebt Reduced: ₹${res.data.debt_cleared}`
+        if (res.data.advance_saved > 0) msg += `\nAdvance Saved: ₹${res.data.advance_saved}`
+        alert(msg)
         router.push('/client/inventory')
       } else {
         alert(res.data.message || 'Failed to process return')
@@ -297,7 +327,7 @@ const Return = () => {
   }
 
   // --- Total ---
-  const customerTotal = customerItems.filter(i => i.selected).reduce((s, i) => s + (i.quantity * i.selling_price), 0)
+  const customerTotal = returnItems.reduce((s, i) => s + (i.quantity * i.selling_price), 0)
   const sellerTotal = sellerItems.reduce((s, i) => s + (i.quantity * i.buying_rate), 0)
 
   return (
@@ -339,57 +369,6 @@ const Return = () => {
             <FaFileAlt className="text-[#008C83] text-xl" /> Customer Return Details
           </h2>
 
-          {/* Customer search */}
-          <div className="relative">
-            <label className="block text-sm font-medium text-gray-600 mb-1.5">Customer *</label>
-            <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 h-11">
-              <HiMiniMagnifyingGlass className="h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                value={customerSearch}
-                onChange={(e) => handleCustomerSearch(e.target.value)}
-                onFocus={() => customerSearch && setShowCustomerDropdown(true)}
-                onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
-                placeholder="Search customer by name or phone..."
-                className="flex-1 bg-transparent text-sm outline-none"
-              />
-            </div>
-            {showCustomerDropdown && customers.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
-                {customers.map(c => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onMouseDown={() => selectCustomer(c)}
-                    className="w-full text-left px-3 py-2.5 hover:bg-[#E6FFFD] text-sm border-b border-gray-50 last:border-0 flex justify-between cursor-pointer"
-                  >
-                    <span className="font-medium text-gray-700">{c.name}</span>
-                    <span className="text-gray-400 text-xs">{c.phone || ''}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Order selection */}
-          {selectedCustomer && orders.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1.5">Select original order (optional)</label>
-              <select
-                value={selectedOrder || ''}
-                onChange={(e) => selectOrder(e.target.value ? Number(e.target.value) : null)}
-                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:border-[#008C83]"
-              >
-                <option value="">-- No specific order --</option>
-                {orders.map(o => (
-                  <option key={o.id} value={o.id}>
-                    {o.invoice_id} — ₹{o.final_amount} — {new Date(o.created_at).toLocaleDateString()}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
           {/* Location */}
           {locations.length > 1 && (
             <div>
@@ -406,45 +385,91 @@ const Return = () => {
             </div>
           )}
 
-          {/* Items from order */}
-          {customerItems.length > 0 && (
+          {/* Product search + barcode scan */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1.5">Add Product</label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 h-11">
+                  <HiMiniMagnifyingGlass className="h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={cProductSearch}
+                    onChange={(e) => handleCProductSearch(e.target.value)}
+                    onFocus={() => cProductSearch && setCShowProductDropdown(true)}
+                    onBlur={() => setTimeout(() => setCShowProductDropdown(false), 200)}
+                    placeholder="Search product by name, code, or barcode..."
+                    className="flex-1 bg-transparent text-sm outline-none"
+                  />
+                </div>
+                {cShowProductDropdown && cProductResults.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                    {cProductResults.map(p => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onMouseDown={() => addReturnItem(p)}
+                        className="w-full text-left px-3 py-2.5 hover:bg-[#E6FFFD] text-sm border-b border-gray-50 last:border-0 flex justify-between cursor-pointer"
+                      >
+                        <span className="font-medium text-gray-700">{p.name}</span>
+                        <span className="text-gray-400 text-xs">₹{p.default_selling_price} / {p.unit || 'pcs'}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowScanner(true)}
+                className="px-4 h-11 border border-gray-200 rounded-lg hover:bg-[#E6FFFD] hover:border-[#008C83] duration-150 flex items-center gap-2 text-sm text-gray-600 cursor-pointer"
+              >
+                <MdQrCodeScanner className="text-lg text-[#008C83]" /> Scan
+              </button>
+            </div>
+          </div>
+
+          {/* Items table */}
+          {returnItems.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">Select items to return</label>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Items to Return</label>
               <div className="border border-gray-200 rounded-lg overflow-hidden">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="text-left px-4 py-2.5 font-medium text-gray-500">Select</th>
                       <th className="text-left px-4 py-2.5 font-medium text-gray-500">Product</th>
-                      <th className="text-left px-4 py-2.5 font-medium text-gray-500">Price</th>
-                      <th className="text-left px-4 py-2.5 font-medium text-gray-500">Ordered</th>
-                      <th className="text-left px-4 py-2.5 font-medium text-gray-500">Return Qty</th>
+                      <th className="text-left px-4 py-2.5 font-medium text-gray-500">Qty</th>
+                      <th className="text-left px-4 py-2.5 font-medium text-gray-500">Price (₹)</th>
+                      <th className="text-left px-4 py-2.5 font-medium text-gray-500">Total</th>
+                      <th className="text-left px-4 py-2.5 font-medium text-gray-500"></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {customerItems.map((item, index) => (
+                    {returnItems.map((item, index) => (
                       <tr key={index} className="border-t border-gray-100">
+                        <td className="px-4 py-2.5 font-medium text-gray-700">{item.product_name}</td>
                         <td className="px-4 py-2.5">
                           <input
-                            type="checkbox"
-                            checked={item.selected}
-                            onChange={() => toggleCustomerItem(index)}
-                            className="accent-[#008C83]"
+                            type="number"
+                            min={1}
+                            value={item.quantity}
+                            onChange={(e) => updateReturnItemQty(index, e.target.value)}
+                            className="w-20 px-2 py-1 border border-gray-200 rounded text-center text-sm"
                           />
                         </td>
-                        <td className="px-4 py-2.5 font-medium text-gray-700">{item.product_name}</td>
-                        <td className="px-4 py-2.5 text-gray-500">₹{item.selling_price}</td>
-                        <td className="px-4 py-2.5 text-gray-500">{item.max_qty}</td>
                         <td className="px-4 py-2.5">
                           <input
                             type="number"
                             min={0}
-                            max={item.max_qty}
-                            value={item.quantity}
-                            onChange={(e) => updateCustomerItemQty(index, e.target.value)}
-                            disabled={!item.selected}
-                            className="w-20 px-2 py-1 border border-gray-200 rounded text-center text-sm disabled:opacity-40"
+                            value={item.selling_price}
+                            onChange={(e) => updateReturnItemPrice(index, e.target.value)}
+                            className="w-24 px-2 py-1 border border-gray-200 rounded text-center text-sm"
                           />
+                        </td>
+                        <td className="px-4 py-2.5 text-gray-600">₹{(item.quantity * item.selling_price).toFixed(2)}</td>
+                        <td className="px-4 py-2.5">
+                          <button onClick={() => removeReturnItem(index)} className="text-red-400 hover:text-red-600 cursor-pointer">
+                            <IoClose className="text-lg" />
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -454,23 +479,102 @@ const Return = () => {
             </div>
           )}
 
-          {/* Refund method */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-2">Refund method</label>
-            <div className="flex gap-4">
-              {['cash', 'debt_adjustment'].map(method => (
-                <div
-                  key={method}
-                  onClick={() => setRefundMethod(method)}
-                  className={`flex-1 py-3 text-center border rounded-lg cursor-pointer duration-150 text-sm font-medium ${
-                    refundMethod === method
-                      ? 'border-[#008C83] bg-[#E6FFFD] text-[#008C83]'
-                      : 'border-gray-200 text-gray-400'
-                  }`}
-                >
-                  {method === 'cash' ? 'Cash Refund' : 'Debt Adjustment'}
+          {/* Customer section (optional) */}
+          <div className="border border-gray-200 rounded-lg">
+            <div
+              className="flex items-center justify-between px-4 py-3 bg-gray-50 cursor-pointer"
+              onClick={() => { if (selectedCustomer) clearCustomer(); }}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-600">Customer (Optional)</span>
+                {!selectedCustomer && <span className="text-xs text-gray-400">— Skip for cash refund</span>}
+              </div>
+              {selectedCustomer && (
+                <button type="button" onClick={clearCustomer} className="text-xs text-red-400 hover:text-red-600 cursor-pointer">Clear</button>
+              )}
+            </div>
+            <div className="px-4 py-3">
+              {!selectedCustomer ? (
+                <div className="relative">
+                  <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 h-10">
+                    <HiMiniMagnifyingGlass className="h-4 w-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={customerSearch}
+                      onChange={(e) => handleCustomerSearch(e.target.value)}
+                      onFocus={() => customerSearch && setShowCustomerDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
+                      placeholder="Search customer by name or phone..."
+                      className="flex-1 bg-transparent text-sm outline-none"
+                    />
+                  </div>
+                  {showCustomerDropdown && customers.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                      {customers.map(c => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onMouseDown={() => selectCustomer(c)}
+                          className="w-full text-left px-3 py-2.5 hover:bg-[#E6FFFD] text-sm border-b border-gray-50 last:border-0 flex justify-between cursor-pointer"
+                        >
+                          <span className="font-medium text-gray-700">{c.name}</span>
+                          <span className="text-gray-400 text-xs">{c.phone || ''}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ))}
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="font-medium text-gray-700">{selectedCustomer.name}</p>
+                      {selectedCustomer.phone && <p className="text-xs text-gray-400">{selectedCustomer.phone}</p>}
+                    </div>
+                    {customerDebtInfo && (
+                      <div className="flex gap-3 text-xs">
+                        {customerDebtInfo.total_debt > 0 && (
+                          <span className="px-2 py-1 bg-red-50 text-red-600 rounded font-medium">Debt: ₹{customerDebtInfo.total_debt.toFixed(2)}</span>
+                        )}
+                        {customerDebtInfo.advance_balance > 0 && (
+                          <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded font-medium">Advance: ₹{customerDebtInfo.advance_balance.toFixed(2)}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Refund method */}
+                  <label className="block text-xs font-medium text-gray-500 mb-2">Where should the refund go?</label>
+                  <div className="flex gap-3">
+                    <div
+                      onClick={() => setRefundMethod('cash')}
+                      className={`flex-1 py-2.5 text-center border rounded-lg cursor-pointer duration-150 text-sm font-medium ${
+                        refundMethod === 'cash' ? 'border-[#008C83] bg-[#E6FFFD] text-[#008C83]' : 'border-gray-200 text-gray-400'
+                      }`}
+                    >Cash Refund</div>
+                    {customerDebtInfo && customerDebtInfo.total_debt > 0 && (
+                      <div
+                        onClick={() => setRefundMethod('debt_reduce')}
+                        className={`flex-1 py-2.5 text-center border rounded-lg cursor-pointer duration-150 text-sm font-medium ${
+                          refundMethod === 'debt_reduce' ? 'border-orange-400 bg-orange-50 text-orange-600' : 'border-gray-200 text-gray-400'
+                        }`}
+                      >Reduce Debt</div>
+                    )}
+                    <div
+                      onClick={() => setRefundMethod('advance')}
+                      className={`flex-1 py-2.5 text-center border rounded-lg cursor-pointer duration-150 text-sm font-medium ${
+                        refundMethod === 'advance' ? 'border-blue-400 bg-blue-50 text-blue-600' : 'border-gray-200 text-gray-400'
+                      }`}
+                    >Add to Advance</div>
+                  </div>
+
+                  {refundMethod === 'debt_reduce' && customerDebtInfo && customerTotal > customerDebtInfo.total_debt && (
+                    <p className="text-xs text-orange-500 mt-2">
+                      Refund (₹{customerTotal.toFixed(2)}) exceeds debt (₹{customerDebtInfo.total_debt.toFixed(2)}). Extra ₹{(customerTotal - customerDebtInfo.total_debt).toFixed(2)} will be saved as advance.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -489,7 +593,13 @@ const Return = () => {
           {/* Total */}
           {customerTotal > 0 && (
             <div className="flex items-center justify-between p-4 bg-[#E6FFFD] rounded-lg">
-              <span className="text-sm font-medium text-gray-600">Total refund amount</span>
+              <div>
+                <span className="text-sm font-medium text-gray-600">Total refund amount</span>
+                {!selectedCustomer && <span className="text-xs text-gray-400 ml-2">(Cash)</span>}
+                {selectedCustomer && refundMethod === 'debt_reduce' && <span className="text-xs text-orange-500 ml-2">(Debt Reduction)</span>}
+                {selectedCustomer && refundMethod === 'advance' && <span className="text-xs text-blue-500 ml-2">(Added to Advance)</span>}
+                {selectedCustomer && refundMethod === 'cash' && <span className="text-xs text-gray-400 ml-2">(Cash)</span>}
+              </div>
               <span className="text-lg font-bold text-[#008C83]">₹{customerTotal.toFixed(2)}</span>
             </div>
           )}
@@ -502,14 +612,17 @@ const Return = () => {
             <button
               type="button"
               onClick={handleCustomerReturn}
-              disabled={submitting}
+              disabled={submitting || returnItems.length === 0}
               className="px-6 py-2.5 bg-[#008C83] text-white rounded-lg hover:bg-[#007571] duration-200 text-sm font-medium disabled:opacity-50 cursor-pointer"
             >
-              {submitting ? 'Processing...' : 'Process Customer Return'}
+              {submitting ? 'Processing...' : `Process Return (${returnItems.length} items)`}
             </button>
           </div>
         </div>
       )}
+
+      {/* Barcode Scanner Modal */}
+      <BarcodeScanner isOpen={showScanner} onClose={() => setShowScanner(false)} onBarcodeScanned={handleBarcodeScan} />
 
       {/* ============ SELLER RETURN ============ */}
       {returnType === 'seller' && (

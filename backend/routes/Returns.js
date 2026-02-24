@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { dbRun, dbGet, dbAll, logStockHistory, addStockToBatch, generateId } = require('../lib/stockHelper');
-const { verifyToken } = require('../lib/authMiddleware');
+const { verifyToken, requirePermission } = require('../lib/authMiddleware');
 
-router.get('/customer', verifyToken, async (req, res) => {
+router.get('/customer', verifyToken, requirePermission('billing'), async (req, res) => {
   try {
     const { buyer_id, start_date, end_date } = req.query;
     let sql = `SELECT cr.*, b.name as buyer_name, b.phone as buyer_phone, l.name as location_name,
@@ -28,7 +28,7 @@ router.get('/customer', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/customer/:id', verifyToken, async (req, res) => {
+router.get('/customer/:id', verifyToken, requirePermission('billing'), async (req, res) => {
   try {
     const ret = await dbGet(
       `SELECT cr.*, b.name as buyer_name, l.name as location_name, o.invoice_id, u.name as created_by_name
@@ -58,18 +58,25 @@ router.get('/customer/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/customer', verifyToken, async (req, res) => {
+router.post('/customer', verifyToken, requirePermission('billing'), async (req, res) => {
   try {
-    const { order_id, buyer_id, location_id, refund_method, reason, items } = req.body;
+    let { order_id, buyer_id, location_id, refund_method, reason, items } = req.body;
 
-    if (!buyer_id || !location_id || !items || !items.length) {
-      return res.status(400).json({ success: false, message: 'Buyer, location, and items are required' });
+    if (!location_id || !items || !items.length) {
+      return res.status(400).json({ success: false, message: 'Location and items are required' });
+    }
+
+    if (!buyer_id) {
+      const walkIn = await dbGet(`SELECT id FROM buyers WHERE name = 'Walk-in Customer'`);
+      if (!walkIn) return res.status(400).json({ success: false, message: 'Walk-in Customer not found in system' });
+      buyer_id = walkIn.id;
+      refund_method = 'cash';
     }
 
     let totalRefund = 0;
     for (const item of items) {
-      if (!item.product_id || !item.batch_id || !item.quantity || !item.selling_price) {
-        return res.status(400).json({ success: false, message: 'Each item needs product_id, batch_id, quantity, and selling_price' });
+      if (!item.product_id || !item.quantity || !item.selling_price) {
+        return res.status(400).json({ success: false, message: 'Each item needs product_id, quantity, and selling_price' });
       }
       totalRefund += item.quantity * item.selling_price;
     }
@@ -84,22 +91,38 @@ router.post('/customer', verifyToken, async (req, res) => {
     const returnId = returnResult.lastID;
 
     for (const item of items) {
-      const stockResult = await addStockToBatch(item.batch_id, item.quantity);
-
-      let orderItemId = null;
-      if (order_id && item.order_item_id) {
-        orderItemId = item.order_item_id;
+      let batchId = item.batch_id;
+      if (!batchId) {
+        const batch = await dbGet(
+          `SELECT id FROM batches WHERE product_id = ? AND location_id = ? ORDER BY created_at DESC LIMIT 1`,
+          [item.product_id, location_id]
+        );
+        if (!batch) {
+          // Try any location
+          const anyBatch = await dbGet(
+            `SELECT id FROM batches WHERE product_id = ? ORDER BY created_at DESC LIMIT 1`,
+            [item.product_id]
+          );
+          if (!anyBatch) {
+            return res.status(400).json({ success: false, message: `No batch found for product. Please add stock first.` });
+          }
+          batchId = anyBatch.id;
+        } else {
+          batchId = batch.id;
+        }
       }
+
+      const stockResult = await addStockToBatch(batchId, item.quantity);
 
       await dbRun(
         `INSERT INTO customer_return_items (return_id, order_item_id, product_id, batch_id, quantity, selling_price, refund_amount)
         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [returnId, orderItemId, item.product_id, item.batch_id, item.quantity, item.selling_price, item.quantity * item.selling_price]
+        [returnId, item.order_item_id || null, item.product_id, batchId, item.quantity, item.selling_price, item.quantity * item.selling_price]
       );
 
       await logStockHistory({
         productId: item.product_id,
-        batchId: item.batch_id,
+        batchId: batchId,
         locationId: location_id,
         referenceType: 'customer_return',
         referenceId: returnId,
@@ -112,10 +135,20 @@ router.post('/customer', verifyToken, async (req, res) => {
       });
     }
 
-    if (order_id && refund_method === 'debt_adjustment') {
-      const debt = await dbGet(`SELECT * FROM debts WHERE order_id = ? AND buyer_id = ?`, [order_id, buyer_id]);
-      if (debt && debt.amount_remaining > 0) {
-        const deductAmount = Math.min(totalRefund, debt.amount_remaining);
+    let debtCleared = 0;
+    let advanceSaved = 0;
+
+    if (refund_method === 'debt_reduce') {
+      // FIFO through all pending debts for this buyer
+      const pendingDebts = await dbAll(
+        `SELECT * FROM debts WHERE buyer_id = ? AND status IN ('pending', 'partial') ORDER BY created_at ASC`,
+        [buyer_id]
+      );
+
+      let remaining = totalRefund;
+      for (const debt of pendingDebts) {
+        if (remaining <= 0) break;
+        const deductAmount = Math.min(remaining, debt.amount_remaining);
         const newRemaining = debt.amount_remaining - deductAmount;
         const newPaid = debt.paid_amount + deductAmount;
         const newStatus = newRemaining <= 0 ? 'paid' : 'partial';
@@ -124,16 +157,41 @@ router.post('/customer', verifyToken, async (req, res) => {
           `UPDATE debts SET paid_amount = ?, amount_remaining = ?, status = ?, updated_at = datetime('now') WHERE id = ?`,
           [newPaid, Math.max(0, newRemaining), newStatus, debt.id]
         );
+
+        await dbRun(
+          `INSERT INTO debt_payments (debt_id, amount, payment_method, notes, received_by) VALUES (?, ?, 'return_adjustment', ?, ?)`,
+          [debt.id, deductAmount, `Return ${returnNumber}`, req.user.id]
+        );
+
+        remaining -= deductAmount;
+        debtCleared += deductAmount;
       }
+
+      // If refund exceeds all debts, save remainder as advance
+      if (remaining > 0) {
+        await dbRun(`UPDATE buyers SET advance_balance = advance_balance + ? WHERE id = ?`, [remaining, buyer_id]);
+        advanceSaved = remaining;
+      }
+    } else if (refund_method === 'advance') {
+      await dbRun(`UPDATE buyers SET advance_balance = advance_balance + ? WHERE id = ?`, [totalRefund, buyer_id]);
+      advanceSaved = totalRefund;
     }
 
-    res.status(201).json({ success: true, message: 'Customer return processed', id: returnId, return_number: returnNumber });
+    res.status(201).json({
+      success: true,
+      message: 'Customer return processed',
+      id: returnId,
+      return_number: returnNumber,
+      total_refund: totalRefund,
+      debt_cleared: debtCleared,
+      advance_saved: advanceSaved
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-router.get('/seller', verifyToken, async (req, res) => {
+router.get('/seller', verifyToken, requirePermission('purchase_view'), async (req, res) => {
   try {
     const { seller_id, start_date, end_date } = req.query;
     let sql = `SELECT sr.*, s.name as seller_name, s.company_name, l.name as location_name,
@@ -158,7 +216,7 @@ router.get('/seller', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/seller/:id', verifyToken, async (req, res) => {
+router.get('/seller/:id', verifyToken, requirePermission('purchase_view'), async (req, res) => {
   try {
     const ret = await dbGet(
       `SELECT sr.*, s.name as seller_name, l.name as location_name, p.invoice_number, u.name as created_by_name
@@ -188,7 +246,7 @@ router.get('/seller/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/seller', verifyToken, async (req, res) => {
+router.post('/seller', verifyToken, requirePermission('purchase_create'), async (req, res) => {
   try {
     const { seller_id, purchase_id, location_id, refund_method, reason, items } = req.body;
 

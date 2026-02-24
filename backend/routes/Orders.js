@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { dbRun, dbGet, dbAll, logStockHistory, deductStockFIFO, generateId } = require('../lib/stockHelper');
-const { verifyToken } = require('../lib/authMiddleware');
+const { verifyToken, requirePermission } = require('../lib/authMiddleware');
 
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requirePermission(['billing', 'invoice']), async (req, res) => {
   try {
     const { buyer_id, location_id, start_date, end_date, payment_status, status } = req.query;
     let sql = `SELECT o.*, b.name as buyer_name, b.phone as buyer_phone, l.name as location_name, u.name as created_by_name
@@ -29,7 +29,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/today', verifyToken, async (req, res) => {
+router.get('/today', verifyToken, requirePermission(['billing', 'invoice']), async (req, res) => {
   try {
     const today = new Date().toISOString().slice(0, 10);
     const orders = await dbAll(
@@ -54,7 +54,72 @@ router.get('/today', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/:id', verifyToken, async (req, res) => {
+router.get('/invoice/:invoiceId', verifyToken, requirePermission(['billing', 'invoice']), async (req, res) => {
+  try {
+    const order = await dbGet(
+      `SELECT o.*, b.name as buyer_name, b.phone as buyer_phone, b.address as buyer_address,
+        l.name as location_name, u.name as created_by_name
+      FROM orders o
+      LEFT JOIN buyers b ON o.buyer_id = b.id
+      LEFT JOIN locations l ON o.location_id = l.id
+      LEFT JOIN users u ON o.created_by = u.id
+      WHERE o.invoice_id = ?`,
+      [req.params.invoiceId]
+    );
+    if (!order) return res.status(404).json({ success: false, message: 'Invoice not found' });
+
+    const rawItems = await dbAll(
+      `SELECT oi.*, p.name as product_name, p.product_code, p.unit, bt.batch_no, bt.expire_date
+      FROM order_items oi
+      JOIN products p ON oi.product_id = p.id
+      JOIN batches bt ON oi.batch_id = bt.id
+      WHERE oi.order_id = ?`,
+      [order.id]
+    );
+
+    const grouped = {};
+    for (const item of rawItems) {
+      if (!grouped[item.product_id]) {
+        grouped[item.product_id] = {
+          product_id: item.product_id,
+          product_name: item.product_name,
+          product_code: item.product_code,
+          unit: item.unit,
+          selling_price: item.selling_price,
+          discount_percent: item.discount_percent,
+          tax_percent: item.tax_percent,
+          total_quantity: 0,
+          total_subtotal: 0,
+          batches: []
+        };
+      }
+      grouped[item.product_id].total_quantity += item.quantity;
+      grouped[item.product_id].total_subtotal += item.subtotal;
+      grouped[item.product_id].batches.push({
+        batch_id: item.batch_id,
+        batch_no: item.batch_no,
+        expire_date: item.expire_date,
+        quantity: item.quantity,
+        buying_rate: item.buying_rate
+      });
+    }
+
+    order.items = Object.values(grouped);
+
+    const debt = await dbGet(`SELECT * FROM debts WHERE order_id = ?`, [order.id]);
+    if (debt) {
+      const payments = await dbAll(`SELECT * FROM debt_payments WHERE debt_id = ? ORDER BY created_at DESC`, [debt.id]);
+      debt.payments = payments;
+      order.debt = debt;
+    }
+
+    res.json({ success: true, order });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get('/:id', verifyToken, requirePermission(['billing', 'invoice']), async (req, res) => {
   try {
     const order = await dbGet(
       `SELECT o.*, b.name as buyer_name, b.phone as buyer_phone, b.address as buyer_address,
@@ -120,9 +185,9 @@ router.get('/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, requirePermission('billing'), async (req, res) => {
   try {
-    const { buyer_id, location_id, discount_amount, received_amount, payment_method, notes, items } = req.body;
+    const { buyer_id, location_id, discount_amount, received_amount, payment_method, notes, items, use_advance } = req.body;
 
     if (!buyer_id || !location_id || !items || !items.length) {
       return res.status(400).json({ success: false, message: 'Buyer, location, and items are required' });
@@ -169,10 +234,22 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     const finalAmount = totalSellPrice + taxAmount - (discount_amount || 0);
-    const receivedAmt = received_amount || 0;
+    let receivedAmt = received_amount || 0;
+    
+    // Auto-deduct advance balance if requested
+    let advanceUsed = 0;
+    if (use_advance && buyer.advance_balance > 0) {
+      advanceUsed = Math.min(buyer.advance_balance, finalAmount);
+      receivedAmt += advanceUsed;
+      await dbRun(`UPDATE buyers SET advance_balance = advance_balance - ? WHERE id = ?`, [advanceUsed, buyer_id]);
+    }
+    
     let paymentStatus = 'pending';
     if (receivedAmt >= finalAmount) paymentStatus = 'paid';
     else if (receivedAmt > 0) paymentStatus = 'partial';
+
+    // Store only the actual cash/upi received (not advance) in orders for accurate reporting
+    const actualReceived = received_amount || 0;
 
     const orderResult = await dbRun(
       `INSERT INTO orders (invoice_id, buyer_id, location_id, total_buy_price, total_sell_price, discount_amount, tax_amount, final_amount, received_amount, payment_method, payment_status, status, notes, created_by)
@@ -218,13 +295,70 @@ router.post('/', verifyToken, async (req, res) => {
       );
     }
 
-    res.status(201).json({ success: true, message: 'Order created', id: orderId, invoice_id: invoiceId, final_amount: finalAmount, payment_status: paymentStatus });
+    // Handle overpayment: excess goes to clear debts first, remainder saved as advance
+    let debtCleared = 0;
+    let advanceSaved = 0;
+    if (receivedAmt > finalAmount) {
+      let excess = receivedAmt - finalAmount;
+
+      // Apply excess to pending debts (oldest first)
+      const pendingDebts = await dbAll(
+        `SELECT * FROM debts WHERE buyer_id = ? AND status IN ('pending', 'partial') ORDER BY created_at ASC`,
+        [buyer_id]
+      );
+
+      for (const debt of pendingDebts) {
+        if (excess <= 0) break;
+        const payAmount = Math.min(excess, debt.amount_remaining);
+
+        await dbRun(
+          `INSERT INTO debt_payments (debt_id, amount, payment_method, notes, received_by) VALUES (?, ?, ?, ?, ?)`,
+          [debt.id, payAmount, payment_method || 'cash', `Auto-applied from overpayment on ${invoiceId}`, req.user.id]
+        );
+
+        const newPaid = debt.paid_amount + payAmount;
+        const newRemaining = debt.amount_remaining - payAmount;
+        const newStatus = newRemaining <= 0 ? 'paid' : 'partial';
+
+        await dbRun(
+          `UPDATE debts SET paid_amount = ?, amount_remaining = ?, status = ?, updated_at = datetime('now') WHERE id = ?`,
+          [newPaid, Math.max(0, newRemaining), newStatus, debt.id]
+        );
+
+        if (newStatus === 'paid') {
+          await dbRun(`UPDATE orders SET payment_status = 'paid', received_amount = final_amount WHERE id = ?`, [debt.order_id]);
+        } else {
+          await dbRun(`UPDATE orders SET payment_status = 'partial', received_amount = received_amount + ? WHERE id = ?`, [payAmount, debt.order_id]);
+        }
+
+        debtCleared += payAmount;
+        excess -= payAmount;
+      }
+
+      // Save remaining excess as advance balance
+      if (excess > 0) {
+        advanceSaved = excess;
+        await dbRun(`UPDATE buyers SET advance_balance = advance_balance + ? WHERE id = ?`, [excess, buyer_id]);
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Order created',
+      id: orderId,
+      invoice_id: invoiceId,
+      final_amount: finalAmount,
+      payment_status: paymentStatus,
+      advance_used: advanceUsed,
+      debt_cleared: debtCleared,
+      advance_saved: advanceSaved
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-router.put('/:id/cancel', verifyToken, async (req, res) => {
+router.put('/:id/cancel', verifyToken, requirePermission('billing'), async (req, res) => {
   try {
     const order = await dbGet(`SELECT * FROM orders WHERE id = ?`, [req.params.id]);
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' });

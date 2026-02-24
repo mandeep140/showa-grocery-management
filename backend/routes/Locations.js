@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { dbRun, dbGet, dbAll } = require('../lib/stockHelper');
-const { verifyToken } = require('../lib/authMiddleware');
+const { verifyToken, requirePermission } = require('../lib/authMiddleware');
 
 router.get('/', verifyToken, async (req, res) => {
   try {
@@ -22,7 +22,7 @@ router.get('/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, requirePermission(['inventory_create', 'inventory_edit']), async (req, res) => {
   try {
     const { name, location_type, address } = req.body;
     if (!name || !location_type) return res.status(400).json({ success: false, message: 'Name and location type are required' });
@@ -34,7 +34,7 @@ router.post('/', verifyToken, async (req, res) => {
   }
 });
 
-router.put('/:id', verifyToken, async (req, res) => {
+router.put('/:id', verifyToken, requirePermission(['inventory_create', 'inventory_edit']), async (req, res) => {
   try {
     const { name, location_type, address, is_active } = req.body;
     if (!name || !location_type) return res.status(400).json({ success: false, message: 'Name and location type are required' });
@@ -47,7 +47,7 @@ router.put('/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.delete('/:id', verifyToken, async (req, res) => {
+router.delete('/:id', verifyToken, requirePermission('inventory_delete'), async (req, res) => {
   try {
     const batches = await dbGet(`SELECT COUNT(*) as count FROM batches WHERE location_id = ? AND quantity_remaining > 0`, [req.params.id]);
     if (batches.count > 0) return res.status(400).json({ success: false, message: `Cannot delete. Location has ${batches.count} active batch(es).` });

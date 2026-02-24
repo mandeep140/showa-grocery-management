@@ -101,6 +101,15 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
+    // Handle 403 - insufficient permissions
+    if (error.response?.status === 403) {
+      const message = error.response?.data?.message || 'Access denied — insufficient permissions';
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('permission-denied', { detail: { message } }));
+      }
+      return Promise.reject(error);
+    }
+
     if (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK' || !error.response) {
       console.error('Network error - server might be down');
       
@@ -113,8 +122,12 @@ api.interceptors.response.use(
           currentServerURL = `http://${newIP}:${SERVER_PORT}`;
           api.defaults.baseURL = currentServerURL;
           
-          error.config.baseURL = currentServerURL;
-          return api.request(error.config);
+          // Only retry safe (GET) requests — POST/PUT/DELETE are not idempotent
+          const method = (error.config?.method || '').toLowerCase();
+          if (method === 'get' || method === 'head' || method === 'options') {
+            error.config.baseURL = currentServerURL;
+            return api.request(error.config);
+          }
         }
       }
       

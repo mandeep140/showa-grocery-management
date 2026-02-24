@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { FiArrowDownLeft, FiArrowUpRight, FiPhone, FiUser, FiX } from 'react-icons/fi'
 import { HiMiniMagnifyingGlass } from 'react-icons/hi2'
 import { FaWallet } from 'react-icons/fa6'
@@ -221,8 +222,8 @@ export default function DebtsPage() {
               </div>
 
               {/* Debts list */}
-              <div className="p-5 flex-1 overflow-y-auto">
-                <h4 className="text-sm font-semibold text-gray-700 mb-3">Debt Records</h4>
+              <div className="p-5 flex-1 overflow-y-auto max-h-[60vh]">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Debt Records ({customerDebts.length})</h4>
                 {customerDebts.length === 0 && (
                   <p className="text-sm text-gray-400 text-center py-8">No debt records</p>
                 )}
@@ -231,14 +232,16 @@ export default function DebtsPage() {
                     <div key={debt.id} className="border border-gray-200 rounded-lg p-4 bg-white">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-gray-800">{debt.invoice_id}</span>
+                          <span className="text-sm font-semibold text-gray-800">
+                            <Link href={`/client/invoice?q=${debt.invoice_id}`} className="hover:underline hover:text-[#008C83]">{debt.invoice_id}</Link>
+                          </span>
                           <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
                             debt.status === 'paid' ? 'bg-green-50 text-green-600' :
                             debt.status === 'partial' ? 'bg-orange-50 text-orange-600' :
                             'bg-red-50 text-red-500'
                           }`}>{debt.status}</span>
                         </div>
-                        <span className="text-xs text-gray-400">{new Date(debt.created_at).toLocaleDateString('en-IN')}</span>
+                        <span className="text-xs text-gray-400">{new Date(debt.created_at + ' UTC').toLocaleDateString('en-IN')}</span>
                       </div>
                       <div className="grid grid-cols-3 gap-4 text-xs">
                         <div>
@@ -265,7 +268,7 @@ export default function DebtsPage() {
                                 <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-50 text-green-500">
                                   <FiArrowDownLeft className="h-3 w-3" />
                                 </span>
-                                <span className="text-gray-500">{new Date(p.created_at).toLocaleDateString('en-IN')}</span>
+                                <span className="text-gray-500">{new Date(p.created_at + ' UTC').toLocaleDateString('en-IN')}</span>
                                 <span className="text-gray-400 capitalize">{p.payment_method}</span>
                               </div>
                               <span className="font-semibold text-green-600">+{money(p.amount)}</span>

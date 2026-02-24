@@ -1,23 +1,24 @@
 const express = require('express');
 const router = express.Router();
 const { dbRun, dbGet, dbAll } = require('../lib/stockHelper');
-const { verifyToken } = require('../lib/authMiddleware');
+const { verifyToken, requirePermission } = require('../lib/authMiddleware');
 
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requirePermission(['customers', 'billing', 'debts']), async (req, res) => {
   try {
-    const { search, is_active } = req.query;
-    let sql = `SELECT b.*, COALESCE(SUM(CASE WHEN d.status IN ('pending', 'partial') THEN d.amount_remaining ELSE 0 END), 0) as total_debt,
-      COUNT(DISTINCT o.id) as total_orders
+    const { search, is_active, include_walkin } = req.query;
+    let sql = `SELECT b.*,
+      COALESCE((SELECT SUM(d.amount_remaining) FROM debts d WHERE d.buyer_id = b.id AND d.status IN ('pending', 'partial')), 0) as total_debt,
+      COALESCE((SELECT COUNT(*) FROM orders o WHERE o.buyer_id = b.id AND o.status = 'completed'), 0) as total_orders
       FROM buyers b
-      LEFT JOIN debts d ON b.id = d.buyer_id
-      LEFT JOIN orders o ON b.id = o.buyer_id AND o.status = 'completed'
       WHERE 1=1`;
     const params = [];
 
+    // Hide walk-in customer unless explicitly requested
+    if (!include_walkin && !search) { sql += ` AND b.name != 'Walk-in Customer'`; }
     if (search) { sql += ` AND (b.name LIKE ? OR b.phone LIKE ? OR b.email LIKE ?)`; params.push(`%${search}%`, `%${search}%`, `%${search}%`); }
     if (is_active !== undefined) { sql += ` AND b.is_active = ?`; params.push(is_active); }
 
-    sql += ` GROUP BY b.id ORDER BY b.name ASC`;
+    sql += ` ORDER BY b.name ASC`;
     const rows = await dbAll(sql, params);
     res.json({ success: true, customers: rows });
   } catch (error) {
@@ -25,14 +26,13 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/:id', verifyToken, async (req, res) => {
+router.get('/:id', verifyToken, requirePermission(['customers', 'billing', 'debts']), async (req, res) => {
   try {
     const customer = await dbGet(`SELECT * FROM buyers WHERE id = ?`, [req.params.id]);
     if (!customer) return res.status(404).json({ success: false, message: 'Customer not found' });
 
     const stats = await dbGet(
-      `SELECT COUNT(DISTINCT o.id) as total_orders, COALESCE(SUM(o.final_amount), 0) as total_purchase_amount,
-        COALESCE(SUM(o.received_amount), 0) as total_paid
+      `SELECT COUNT(DISTINCT o.id) as total_orders, COALESCE(SUM(o.final_amount), 0) as total_purchase_amount
       FROM orders o WHERE o.buyer_id = ? AND o.status = 'completed'`,
       [req.params.id]
     );
@@ -54,10 +54,25 @@ router.get('/:id', verifyToken, async (req, res) => {
       [req.params.id]
     );
 
+    // Get all debt payments for transaction history
+    const allDebtPayments = await dbAll(
+      `SELECT dp.*, d.order_id, o.invoice_id FROM debt_payments dp
+      JOIN debts d ON dp.debt_id = d.id
+      JOIN orders o ON d.order_id = o.id
+      WHERE d.buyer_id = ? ORDER BY dp.created_at DESC`,
+      [req.params.id]
+    );
+
+    // Total paid = total purchased - outstanding debt + advance (simple, always accurate)
+    const totalPaid = (stats.total_purchase_amount || 0) - (totalDebt.total_debt || 0) + (customer.advance_balance || 0);
+
+    stats.total_paid = Math.max(0, totalPaid);
     customer.stats = stats;
     customer.total_debt = totalDebt.total_debt;
+    customer.advance_balance = customer.advance_balance || 0;
     customer.recent_orders = recentOrders;
     customer.pending_debts = pendingDebts;
+    customer.debt_payments = allDebtPayments;
 
     res.json({ success: true, customer });
   } catch (error) {
@@ -65,7 +80,7 @@ router.get('/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, requirePermission('customers'), async (req, res) => {
   try {
     const { name, address, phone, email, opening_balance, notes } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
@@ -82,7 +97,7 @@ router.post('/', verifyToken, async (req, res) => {
   }
 });
 
-router.put('/:id', verifyToken, async (req, res) => {
+router.put('/:id', verifyToken, requirePermission('customers'), async (req, res) => {
   try {
     const { name, address, phone, email, opening_balance, notes, is_active } = req.body;
     const customer = await dbGet(`SELECT * FROM buyers WHERE id = ?`, [req.params.id]);
@@ -109,7 +124,7 @@ router.put('/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.delete('/:id', verifyToken, async (req, res) => {
+router.delete('/:id', verifyToken, requirePermission('customers'), async (req, res) => {
   try {
     const pendingDebts = await dbGet(`SELECT COUNT(*) as count FROM debts WHERE buyer_id = ? AND status IN ('pending', 'partial')`, [req.params.id]);
     if (pendingDebts.count > 0) {
@@ -123,7 +138,7 @@ router.delete('/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/:id/orders', verifyToken, async (req, res) => {
+router.get('/:id/orders', verifyToken, requirePermission(['customers', 'billing']), async (req, res) => {
   try {
     const { start_date, end_date } = req.query;
     let sql = `SELECT o.*, l.name as location_name, u.name as created_by_name FROM orders o
@@ -143,7 +158,7 @@ router.get('/:id/orders', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/:id/debts', verifyToken, async (req, res) => {
+router.get('/:id/debts', verifyToken, requirePermission(['customers', 'debts']), async (req, res) => {
   try {
     const debts = await dbAll(
       `SELECT d.*, o.invoice_id FROM debts d JOIN orders o ON d.order_id = o.id
@@ -157,7 +172,8 @@ router.get('/:id/debts', verifyToken, async (req, res) => {
     }
 
     const summary = await dbGet(
-      `SELECT COALESCE(SUM(total_amount), 0) as total_debt, COALESCE(SUM(paid_amount), 0) as total_paid,
+      `SELECT COALESCE(SUM(amount_remaining + paid_amount), 0) as total_debt_amount,
+        COALESCE(SUM(paid_amount), 0) as total_paid,
         COALESCE(SUM(amount_remaining), 0) as total_remaining
       FROM debts WHERE buyer_id = ? AND status IN ('pending', 'partial')`,
       [req.params.id]
@@ -169,7 +185,7 @@ router.get('/:id/debts', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/:id/pay-debt', verifyToken, async (req, res) => {
+router.post('/:id/pay-debt', verifyToken, requirePermission('debts'), async (req, res) => {
   try {
     const { amount, payment_method, notes, debt_id } = req.body;
     if (!amount || amount <= 0) return res.status(400).json({ success: false, message: 'Valid amount is required' });
@@ -219,7 +235,14 @@ router.post('/:id/pay-debt', verifyToken, async (req, res) => {
       remainingPayment -= payAmount;
     }
 
-    res.json({ success: true, message: 'Payment recorded', payments: paymentsCreated, excess: Math.max(0, remainingPayment) });
+    // If there's excess, save as advance
+    let advanceSaved = 0;
+    if (remainingPayment > 0) {
+      advanceSaved = remainingPayment;
+      await dbRun(`UPDATE buyers SET advance_balance = advance_balance + ? WHERE id = ?`, [remainingPayment, req.params.id]);
+    }
+
+    res.json({ success: true, message: 'Payment recorded', payments: paymentsCreated, excess: 0, advance_saved: advanceSaved });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

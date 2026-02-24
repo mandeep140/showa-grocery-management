@@ -1,8 +1,10 @@
 'use client'
 import React, { useState, useEffect, useRef } from 'react'
 import { IoMdArrowBack } from "react-icons/io"
+import { HiOutlineQrCode } from 'react-icons/hi2'
 import Link from 'next/link'
 import api from '@/util/api'
+import BarcodeScanner from '@/component/BarcodeScanner'
 
 const Add = () => {
     const [categories, setCategories] = useState([])
@@ -11,6 +13,7 @@ const Add = () => {
     const [imagePreview, setImagePreview] = useState(null)
     const [imageFile, setImageFile] = useState(null)
     const fileRef = useRef(null)
+    const [scannerOpen, setScannerOpen] = useState(false)
 
     const [form, setForm] = useState({
         name: '', category_id: '', brand_id: '', unit: 'pcs',
@@ -102,28 +105,37 @@ const Add = () => {
     const update = (field, value) => setForm(prev => ({ ...prev, [field]: value }))
 
     return (
-        <div className='w-full min-h-screen px-15 py-20 bg-[#E6FFFD]'>
-            <Link href="/client/inventory" className='flex items-center mb-8 hover:text-gray-500 duration-200'> <IoMdArrowBack /> &nbsp; Back to inventory</Link>
-            <h1 className='text-3xl font-bold mb-10'>Add Product</h1>
+        <div className='w-full min-h-screen px-4 sm:px-8 lg:px-15 pt-20 pb-8 bg-[#E6FFFD]'>
+            <Link href="/client/inventory" className='flex items-center mb-8 hover:text-gray-500 duration-200'>
+                <IoMdArrowBack /> &nbsp; Back to inventory
+            </Link>
+            <h1 className='text-2xl sm:text-3xl font-bold mb-8'>Add Product</h1>
 
-            <div className='w-[70%] mx-auto rounded-xl bg-white p-6'>
+            <div className='w-full md:w-[85%] lg:w-[70%] mx-auto rounded-xl bg-white p-5 sm:p-6'>
                 <form onSubmit={handleSubmit} className='flex flex-col gap-6'>
-                    <div className='flex flex-col items-center gap-4'>
-                        <p className='text-lg font-bold mb-4 mr-auto'>Product image</p>
-                        <div className='flex items-center justify-start w-full'>
-                            <div className='w-32 h-32 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-sm overflow-hidden'>
+
+                    {/* Product Image */}
+                    <div className='flex flex-col gap-4'>
+                        <p className='text-lg font-bold'>Product image</p>
+                        <div className='flex flex-wrap items-center gap-4'>
+                            <div className='w-28 h-28 sm:w-32 sm:h-32 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-sm overflow-hidden flex-shrink-0'>
                                 {imagePreview ? <img src={imagePreview} alt="Preview" className='w-full h-full object-cover' /> : 'Preview'}
                             </div>
-                            <div className='ml-6 flex flex-col gap-2'>
-                                <button type='button' onClick={() => fileRef.current?.click()} className='px-4 py-2 rounded-lg text-[#008C83] border border-[#008C83] hover:bg-[#E6FFFD] duration-200 cursor-pointer'>Upload Image</button>
+                            <div className='flex flex-col gap-2'>
+                                <button type='button' onClick={() => fileRef.current?.click()} className='px-4 py-2 rounded-lg text-[#008C83] border border-[#008C83] hover:bg-[#E6FFFD] duration-200 cursor-pointer'>
+                                    Upload Image
+                                </button>
                                 <p className='text-xs text-gray-400'>Max 5MB. JPEG, PNG, WebP</p>
                             </div>
                             <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className='hidden' onChange={handleImageChange} />
                         </div>
                     </div>
 
-                    <div className='flex flex-col gap-6'>
-                        <p className='text-lg font-bold mb-4 mr-auto'>Basic information</p>
+                    <div className='w-full h-px bg-gray-200 rounded'></div>
+
+                    {/* Basic Information */}
+                    <div className='flex flex-col gap-5'>
+                        <p className='text-lg font-bold'>Basic information</p>
                         <span className='flex flex-col gap-2 w-full'>
                             <label className='text-sm font-light'>Product Name*</label>
                             <input value={form.name} onChange={(e) => update('name', e.target.value)} placeholder="Tata salt 1KG" required className='px-4 py-2 border border-gray-300 rounded-lg' />
@@ -142,10 +154,13 @@ const Add = () => {
                                 {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                             </select>
                         </span>
+                    </div>
 
-                        <div className='w-full h-px bg-gray-200 my-3 rounded'></div>
+                    <div className='w-full h-px bg-gray-200 rounded'></div>
 
-                        <p className='text-lg font-bold mb-4 mr-auto'>Product configuration</p>
+                    {/* Product Configuration */}
+                    <div className='flex flex-col gap-5'>
+                        <p className='text-lg font-bold'>Product configuration</p>
                         <span className='flex flex-col gap-2 w-full'>
                             <label className='text-sm font-light'>Unit*</label>
                             <select value={form.unit} onChange={(e) => update('unit', e.target.value)} className='px-4 py-2 border border-gray-300 rounded-lg bg-white'>
@@ -159,7 +174,7 @@ const Add = () => {
                                 <option value="pack">pack</option>
                             </select>
                         </span>
-                        <div className='w-full flex gap-3 items-center'>
+                        <div className='w-full flex flex-col sm:flex-row gap-4'>
                             <span className='flex flex-col gap-2 w-full'>
                                 <label className='text-sm font-light'>Buying Price</label>
                                 <input type="number" step="0.01" value={form.default_buying_rate} onChange={(e) => update('default_buying_rate', e.target.value)} placeholder="₹ 18" className='px-4 py-2 border border-gray-300 rounded-lg' />
@@ -173,7 +188,7 @@ const Add = () => {
                             <label className='text-sm font-light'>Minimum stock level</label>
                             <input type="number" value={form.minimum_stock_level} onChange={(e) => update('minimum_stock_level', e.target.value)} placeholder="20" className='px-4 py-2 border border-gray-300 rounded-lg' />
                         </span>
-                        <div className='w-full flex gap-3 items-center'>
+                        <div className='w-full flex flex-col sm:flex-row gap-4'>
                             <span className='flex flex-col gap-2 w-full'>
                                 <label className='text-sm font-light'>Bulk quantity</label>
                                 <input type="number" value={form.bulk_quantity} onChange={(e) => update('bulk_quantity', e.target.value)} placeholder="20" className='px-4 py-2 border border-gray-300 rounded-lg' />
@@ -187,10 +202,13 @@ const Add = () => {
                             <label className='text-sm font-light'>Tax %</label>
                             <input type="number" step="0.01" value={form.tax_percent} onChange={(e) => update('tax_percent', e.target.value)} placeholder="5" className='px-4 py-2 border border-gray-300 rounded-lg' />
                         </span>
+                    </div>
 
-                        <div className='w-full h-px bg-gray-200 my-3 rounded'></div>
+                    <div className='w-full h-px bg-gray-200 rounded'></div>
 
-                        <p className='text-lg font-bold mb-4 mr-auto'>System information</p>
+                    {/* System Information */}
+                    <div className='flex flex-col gap-5'>
+                        <p className='text-lg font-bold'>System information</p>
                         <span className='flex flex-col gap-2 w-full'>
                             <label className='text-sm font-light'>Product code*</label>
                             <input value={form.product_code} onChange={(e) => update('product_code', e.target.value)} placeholder="TS-1KG" required className='px-4 py-2 border border-gray-300 rounded-lg' />
@@ -198,23 +216,39 @@ const Add = () => {
                         </span>
                         <span className='flex flex-col gap-2 w-full'>
                             <label className='text-sm font-light'>Barcode</label>
-                            <input value={form.barcode} onChange={(e) => update('barcode', e.target.value)} placeholder="9876543210123" className='px-4 py-2 border border-gray-300 rounded-lg' />
+                            <div className='flex gap-2'>
+                                <input value={form.barcode} onChange={(e) => update('barcode', e.target.value)} placeholder="9876543210123" className='px-4 py-2 border border-gray-300 rounded-lg flex-1' />
+                                <button type='button' onClick={() => setScannerOpen(true)} className='px-3 py-2 rounded-lg border border-[#008C83] text-[#008C83] hover:bg-[#E6FFFD] duration-150 cursor-pointer'>
+                                    <HiOutlineQrCode className='h-5 w-5' />
+                                </button>
+                            </div>
                         </span>
                         <span className='flex flex-col gap-2 w-full'>
                             <label className='text-sm font-light'>Description</label>
                             <textarea value={form.description} onChange={(e) => update('description', e.target.value)} placeholder="Product description..." rows={3} className='px-4 py-2 border border-gray-300 rounded-lg resize-none' />
                         </span>
+                    </div>
 
-                        <div className='w-full h-px bg-gray-200 my-3 rounded'></div>
-                        <div className='w-full flex items-center justify-between'>
-                            <Link href="/client/inventory" className='px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 duration-150'>Cancel</Link>
-                            <button type='submit' disabled={submitting} className='px-6 py-2 bg-[#008C83] text-white rounded-lg hover:bg-[#007571] duration-200 disabled:opacity-50 cursor-pointer'>
-                                {submitting ? 'Adding...' : 'Add Product'}
-                            </button>
-                        </div>
+                    <div className='w-full h-px bg-gray-200 rounded'></div>
+
+                    <div className='w-full flex items-center justify-between'>
+                        <Link href="/client/inventory" className='px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 duration-150'>Cancel</Link>
+                        <button type='submit' disabled={submitting} className='px-6 py-2 bg-[#008C83] text-white rounded-lg hover:bg-[#007571] duration-200 disabled:opacity-50 cursor-pointer'>
+                            {submitting ? 'Adding...' : 'Add Product'}
+                        </button>
                     </div>
                 </form>
             </div>
+
+            <BarcodeScanner
+                isOpen={scannerOpen}
+                onClose={() => setScannerOpen(false)}
+                onBarcodeScanned={(code, cb) => {
+                    update('barcode', code)
+                    setScannerOpen(false)
+                    cb(true, 'Barcode set: ' + code)
+                }}
+            />
         </div>
     )
 }

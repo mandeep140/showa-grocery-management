@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { dbAll } = require('../lib/stockHelper');
-const { verifyToken } = require('../lib/authMiddleware');
+const { verifyToken, requirePermission } = require('../lib/authMiddleware');
 
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requirePermission('inventory_view'), async (req, res) => {
   try {
     const { start_date, end_date, user_id, reference_type, product_id, location_id, limit } = req.query;
     let sql = `SELECT sh.*, p.name as product_name, p.product_code, b.batch_no, l.name as location_name, u.name as user_name
@@ -32,7 +32,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/activity', verifyToken, async (req, res) => {
+router.get('/activity', verifyToken, requirePermission('inventory_view'), async (req, res) => {
   try {
     const { start_date, end_date, user_id, limit } = req.query;
     const maxLimit = parseInt(limit) || 50;
@@ -117,7 +117,7 @@ router.get('/activity', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/user/:userId', verifyToken, async (req, res) => {
+router.get('/user/:userId', verifyToken, requirePermission('inventory_view'), async (req, res) => {
   try {
     const { limit } = req.query;
     const maxLimit = parseInt(limit) || 50;
@@ -150,7 +150,7 @@ router.get('/user/:userId', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/product/:productId', verifyToken, async (req, res) => {
+router.get('/product/:productId', verifyToken, requirePermission('inventory_view'), async (req, res) => {
   try {
     const history = await dbAll(
       `SELECT sh.*, b.batch_no, l.name as location_name, u.name as user_name

@@ -10,6 +10,7 @@ import { FiTrash2 } from "react-icons/fi"
 import Link from 'next/link'
 import { RiFolderReduceFill } from "react-icons/ri"
 import api from '@/util/api'
+import { getServerURL } from '@/util/FindIP'
 
 const Inventory = () => {
     const perPage = 10
@@ -42,6 +43,11 @@ const Inventory = () => {
             const res = await api.get('/api/categories')
             if (res.data.success) setCategories(res.data.categories)
         } catch (err) {}
+    }
+
+    const getImageURL = (path) => {
+        if (!path) return null
+        return `${getServerURL()}/api/products/image/${path}`
     }
 
     const handleDelete = async (id, name) => {
@@ -127,8 +133,8 @@ const Inventory = () => {
                 <table className='w-full mt-6 bg-white rounded-t-lg overflow-hidden'>
                     <thead className='bg-[#F5F5F5]'>
                         <tr>
+                            <th className='text-left p-4 font-semibold'>Image</th>
                             <th className='text-left p-4 font-semibold'>Product Name</th>
-                            <th className='text-left p-4 font-semibold'>Category</th>
                             <th className='text-left p-4 font-semibold'>Unit</th>
                             <th className='text-left p-4 font-semibold'>Total Stock</th>
                             <th className='text-left p-4 font-semibold'>Min Stock</th>
@@ -142,8 +148,16 @@ const Inventory = () => {
                             const status = getStatus(item)
                             return (
                             <tr key={item.id} className={`border-t ${status.bg} duration-200`}>
+                                <td className='p-6 text-sm font-medium'>
+                                    {item.img_path ? (
+                                        <img src={getImageURL(item.img_path)} alt={item.name} className='w-12 h-12 object-cover rounded-md' />
+                                    ) : (
+                                        <div className='w-12 h-12 bg-gray-200 rounded-md flex items-center justify-center text-gray-500'>
+                                            {item.name.charAt(0).toUpperCase()}
+                                        </div>
+                                    )}
+                                </td>
                                 <td className='p-6 text-sm font-medium'>{item.name}</td>
-                                <td className='p-6 text-sm'>{item.category_name || '—'}</td>
                                 <td className='p-6 text-sm'>{item.unit}</td>
                                 <td className='p-6 text-sm'>{item.total_stock} {item.unit}</td>
                                 <td className='p-6 text-sm'>{item.minimum_stock_level} {item.unit}</td>

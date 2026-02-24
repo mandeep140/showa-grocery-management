@@ -15,30 +15,24 @@ export default function RolesPage() {
   });
   const [error, setError] = useState('');
 
-  // Available permissions
+  // Available permissions — must match backend requirePermission() keys
   const availablePermissions = [
-    { id: 'inventory_view', label: 'View Inventory', category: 'Inventory' },
-    { id: 'inventory_add', label: 'Add Inventory', category: 'Inventory' },
-    { id: 'inventory_edit', label: 'Edit Inventory', category: 'Inventory' },
-    { id: 'inventory_delete', label: 'Delete Inventory', category: 'Inventory' },
-    { id: 'inventory_transfer', label: 'Transfer Stock', category: 'Inventory' },
+    { id: 'inventory_view', label: 'View Products & Stock', category: 'Inventory' },
+    { id: 'inventory_create', label: 'Add Products', category: 'Inventory' },
+    { id: 'inventory_edit', label: 'Edit Products / Transfer', category: 'Inventory' },
+    { id: 'inventory_delete', label: 'Delete / Dispose Products', category: 'Inventory' },
+    { id: 'supplier_view', label: 'View Suppliers', category: 'Supplier' },
+    { id: 'supplier_create', label: 'Add Suppliers', category: 'Supplier' },
+    { id: 'supplier_edit', label: 'Edit / Pay Suppliers', category: 'Supplier' },
+    { id: 'supplier_delete', label: 'Delete Suppliers', category: 'Supplier' },
     { id: 'purchase_view', label: 'View Purchases', category: 'Purchase' },
-    { id: 'purchase_add', label: 'Add Purchase', category: 'Purchase' },
-    { id: 'purchase_edit', label: 'Edit Purchase', category: 'Purchase' },
-    { id: 'purchase_delete', label: 'Delete Purchase', category: 'Purchase' },
-    { id: 'order_view', label: 'View Orders', category: 'Orders' },
-    { id: 'order_create', label: 'Create Order', category: 'Orders' },
-    { id: 'order_edit', label: 'Edit Order', category: 'Orders' },
-    { id: 'order_cancel', label: 'Cancel Order', category: 'Orders' },
-    { id: 'billing_view', label: 'View Billing', category: 'Billing' },
-    { id: 'billing_create', label: 'Create Bill', category: 'Billing' },
-    { id: 'billing_payment', label: 'Accept Payment', category: 'Billing' },
-    { id: 'reports_view', label: 'View Reports', category: 'Reports' },
-    { id: 'reports_export', label: 'Export Reports', category: 'Reports' },
-    { id: 'users_view', label: 'View Users', category: 'Users' },
-    { id: 'users_manage', label: 'Manage Users', category: 'Users' },
-    { id: 'settings_view', label: 'View Settings', category: 'Settings' },
-    { id: 'settings_edit', label: 'Edit Settings', category: 'Settings' }
+    { id: 'purchase_create', label: 'Add / Edit Purchases', category: 'Purchase' },
+    { id: 'purchase_delete', label: 'Delete Purchases', category: 'Purchase' },
+    { id: 'billing', label: 'Billing / POS', category: 'Billing' },
+    { id: 'invoice', label: 'Invoice Lookup', category: 'Invoice' },
+    { id: 'debts', label: 'Debts Management', category: 'Debts' },
+    { id: 'reports', label: 'Reports', category: 'Reports' },
+    { id: 'customers', label: 'Customers Management', category: 'Customers' },
   ];
 
   useEffect(() => {
@@ -295,7 +289,22 @@ export default function RolesPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Permissions</label>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-sm font-medium text-gray-700">Permissions</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (formData.permissions.length === availablePermissions.length) {
+                        setFormData(prev => ({ ...prev, permissions: [] }));
+                      } else {
+                        setFormData(prev => ({ ...prev, permissions: availablePermissions.map(p => p.id) }));
+                      }
+                    }}
+                    className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                  >
+                    {formData.permissions.length === availablePermissions.length ? 'Deselect All' : 'Select All'}
+                  </button>
+                </div>
                 <div className="space-y-4 max-h-96 overflow-y-auto border rounded-lg p-4">
                   {Object.entries(permissionsByCategory).map(([category, perms]) => (
                     <div key={category}>

@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { dbGet, dbAll } = require('../lib/stockHelper');
-const { verifyToken } = require('../lib/authMiddleware');
+const { verifyToken, requirePermission } = require('../lib/authMiddleware');
 
-router.get('/sales', verifyToken, async (req, res) => {
+router.get('/sales', verifyToken, requirePermission('reports'), async (req, res) => {
   try {
     const { start_date, end_date, location_id } = req.query;
     let sql = `SELECT o.*, b.name as buyer_name, b.phone as buyer_phone, l.name as location_name, u.name as created_by_name
@@ -21,12 +21,24 @@ router.get('/sales', verifyToken, async (req, res) => {
     sql += ` ORDER BY o.created_at DESC`;
     const orders = await dbAll(sql, params);
 
+    // Get customer returns for the same period
+    let returnSql = `SELECT COALESCE(SUM(total_amount), 0) as total_returns FROM customer_returns WHERE 1=1`;
+    const returnParams = [];
+    if (start_date) { returnSql += ` AND DATE(created_at) >= ?`; returnParams.push(start_date); }
+    if (end_date) { returnSql += ` AND DATE(created_at) <= ?`; returnParams.push(end_date); }
+    if (location_id) { returnSql += ` AND location_id = ?`; returnParams.push(location_id); }
+    const returns = await dbGet(returnSql, returnParams);
+    const totalReturns = returns.total_returns || 0;
+
+    const grossSales = orders.reduce((s, o) => s + (o.final_amount || 0), 0);
     const summary = {
       total_orders: orders.length,
-      total_sales: orders.reduce((s, o) => s + (o.final_amount || 0), 0),
+      total_sales: grossSales - totalReturns,
+      gross_sales: grossSales,
+      total_returns: totalReturns,
       total_received: orders.reduce((s, o) => s + (o.received_amount || 0), 0),
       total_credit: orders.reduce((s, o) => s + ((o.final_amount || 0) - (o.received_amount || 0)), 0),
-      total_profit: orders.reduce((s, o) => s + ((o.total_sell_price || 0) - (o.total_buy_price || 0)), 0),
+      total_profit: orders.reduce((s, o) => s + ((o.total_sell_price || 0) - (o.total_buy_price || 0)), 0) - totalReturns,
       paid_orders: orders.filter(o => o.payment_status === 'paid').length,
       pending_orders: orders.filter(o => o.payment_status !== 'paid').length
     };
@@ -37,7 +49,7 @@ router.get('/sales', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/sales/today', verifyToken, async (req, res) => {
+router.get('/sales/today', verifyToken, requirePermission('reports'), async (req, res) => {
   try {
     const today = new Date().toISOString().slice(0, 10);
     const summary = await dbGet(
@@ -48,6 +60,13 @@ router.get('/sales/today', verifyToken, async (req, res) => {
       FROM orders WHERE DATE(created_at) = ? AND status = 'completed'`,
       [today]
     );
+
+    const todayReturns = await dbGet(
+      `SELECT COALESCE(SUM(total_amount), 0) as total FROM customer_returns WHERE DATE(created_at) = ?`, [today]
+    );
+    summary.total_returns = todayReturns.total || 0;
+    summary.net_sales = summary.total_sales - summary.total_returns;
+    summary.total_profit = summary.total_profit - summary.total_returns;
 
     const topProducts = await dbAll(
       `SELECT p.name as product_name, p.product_code, SUM(oi.quantity) as total_quantity,
@@ -73,7 +92,7 @@ router.get('/sales/today', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/sales/daily', verifyToken, async (req, res) => {
+router.get('/sales/daily', verifyToken, requirePermission('reports'), async (req, res) => {
   try {
     const { start_date, end_date, days } = req.query;
     let sql = `SELECT DATE(created_at) as date, COUNT(*) as total_orders,
@@ -99,7 +118,7 @@ router.get('/sales/daily', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/profit', verifyToken, async (req, res) => {
+router.get('/profit', verifyToken, requirePermission('reports'), async (req, res) => {
   try {
     const { start_date, end_date } = req.query;
     let sql = `SELECT DATE(o.created_at) as date,
@@ -131,7 +150,7 @@ router.get('/profit', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/inventory', verifyToken, async (req, res) => {
+router.get('/inventory', verifyToken, requirePermission('reports'), async (req, res) => {
   try {
     const { location_id } = req.query;
     let sql = `SELECT p.id, p.product_code, p.name, p.unit, c.name as category_name, br.name as brand_name,
@@ -169,7 +188,7 @@ router.get('/inventory', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/purchases', verifyToken, async (req, res) => {
+router.get('/purchases', verifyToken, requirePermission('reports'), async (req, res) => {
   try {
     const { start_date, end_date, seller_id } = req.query;
     let sql = `SELECT p.*, s.name as seller_name, s.company_name, l.name as location_name, u.name as created_by_name,
@@ -204,7 +223,7 @@ router.get('/purchases', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/expiry', verifyToken, async (req, res) => {
+router.get('/expiry', verifyToken, requirePermission('reports'), async (req, res) => {
   try {
     const { days } = req.query;
     const daysAhead = parseInt(days) || 30;
@@ -250,7 +269,7 @@ router.get('/expiry', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/debts', verifyToken, async (req, res) => {
+router.get('/debts', verifyToken, requirePermission('reports'), async (req, res) => {
   try {
     const debts = await dbAll(
       `SELECT d.*, o.invoice_id, b.name as buyer_name, b.phone as buyer_phone
@@ -263,9 +282,8 @@ router.get('/debts', verifyToken, async (req, res) => {
 
     const byCustomer = await dbAll(
       `SELECT b.id, b.name, b.phone, COUNT(d.id) as debt_count,
-        COALESCE(SUM(d.total_amount), 0) as total_debt,
-        COALESCE(SUM(d.paid_amount), 0) as total_paid,
-        COALESCE(SUM(d.amount_remaining), 0) as total_remaining
+        COALESCE(SUM(d.amount_remaining), 0) as total_remaining,
+        COALESCE(SUM(d.paid_amount), 0) as total_paid
       FROM buyers b
       JOIN debts d ON b.id = d.buyer_id AND d.status IN ('pending', 'partial')
       GROUP BY b.id ORDER BY total_remaining DESC`
@@ -285,7 +303,7 @@ router.get('/debts', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/seller-dues', verifyToken, async (req, res) => {
+router.get('/seller-dues', verifyToken, requirePermission('reports'), async (req, res) => {
   try {
     const sellers = await dbAll(
       `SELECT s.id, s.name, s.company_name, s.phone, s.opening_balance,
@@ -312,7 +330,7 @@ router.get('/seller-dues', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/low-stock', verifyToken, async (req, res) => {
+router.get('/low-stock', verifyToken, requirePermission('reports'), async (req, res) => {
   try {
     const products = await dbAll(
       `SELECT p.id, p.product_code, p.name, p.unit, p.minimum_stock_level,
@@ -333,7 +351,7 @@ router.get('/low-stock', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/users', verifyToken, async (req, res) => {
+router.get('/users', verifyToken, requirePermission('reports'), async (req, res) => {
   try {
     const { start_date, end_date } = req.query;
     let dateFilter = '';
@@ -369,6 +387,11 @@ router.get('/dashboard', verifyToken, async (req, res) => {
       FROM orders WHERE DATE(created_at) = ? AND status = 'completed'`,
       [today]
     );
+    const dashReturns = await dbGet(
+      `SELECT COALESCE(SUM(total_amount), 0) as total FROM customer_returns WHERE DATE(created_at) = ?`, [today]
+    );
+    todaySales.returns = dashReturns.total || 0;
+    todaySales.net_sales = todaySales.sales - todaySales.returns;
 
     const totalProducts = await dbGet(`SELECT COUNT(*) as count FROM products WHERE is_active = 1`);
     const lowStockCount = await dbGet(
@@ -410,6 +433,35 @@ router.get('/dashboard', verifyToken, async (req, res) => {
         total_sellers: totalSellers.count
       }
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get('/returns', verifyToken, requirePermission('reports'), async (req, res) => {
+  try {
+    const { start_date, end_date } = req.query;
+    let sql = `SELECT cr.*, b.name as buyer_name, b.phone as buyer_phone, l.name as location_name, u.name as created_by_name
+      FROM customer_returns cr
+      LEFT JOIN buyers b ON cr.buyer_id = b.id
+      LEFT JOIN locations l ON cr.location_id = l.id
+      LEFT JOIN users u ON cr.created_by = u.id
+      WHERE 1=1`;
+    const params = [];
+    if (start_date) { sql += ` AND DATE(cr.created_at) >= ?`; params.push(start_date); }
+    if (end_date) { sql += ` AND DATE(cr.created_at) <= ?`; params.push(end_date); }
+    sql += ` ORDER BY cr.created_at DESC`;
+    const returns = await dbAll(sql, params);
+
+    const summary = {
+      total_returns: returns.length,
+      total_amount: returns.reduce((s, r) => s + (r.total_amount || 0), 0),
+      cash_refunds: returns.filter(r => r.refund_method === 'cash').length,
+      debt_adjustments: returns.filter(r => r.refund_method === 'debt_reduce').length,
+      advance_credits: returns.filter(r => r.refund_method === 'advance').length,
+    };
+
+    res.json({ success: true, returns, summary });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

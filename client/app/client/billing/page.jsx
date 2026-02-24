@@ -15,6 +15,13 @@ import { RiSecurePaymentLine } from 'react-icons/ri'
 import { FiTrash2 } from 'react-icons/fi'
 import api from '@/util/api'
 import { getCurrentServerURL } from '@/util/api'
+import BarcodeScanner from '@/component/BarcodeScanner'
+import {
+  getPrinterSettings,
+  isPrinterConfigured,
+  buildCartReceiptData,
+  printReceipt,
+} from '@/util/thermalPrinter'
 
 const CashIcon = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.667 5H3.334C2.413 5 1.667 5.746 1.667 6.667V13.333C1.667 14.254 2.413 15 3.334 15H16.667C17.587 15 18.334 14.254 18.334 13.333V6.667C18.334 5.746 17.587 5 16.667 5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 11.667A1.667 1.667 0 1 0 10 8.333a1.667 1.667 0 0 0 0 3.334Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -44,13 +51,116 @@ const BillingPage = () => {
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false)
   const [customerForm, setCustomerForm] = useState({ name: '', phone: '', address: '' })
 
+  const [mobileTab, setMobileTab] = useState('products')
+  const [isScannerOpen, setIsScannerOpen] = useState(false)
+  const [barcodeProducts, setBarcodeProducts] = useState([])
+  const [barcodePickerOpen, setBarcodePickerOpen] = useState(false)
+  const [pendingScanCallback, setPendingScanCallback] = useState(null)
+  const [useAdvance, setUseAdvance] = useState(false)
+  const [customerAdvance, setCustomerAdvance] = useState(0)
+  const [printing, setPrinting] = useState(false)
+
   const searchTimeout = useRef(null)
   const selectedLocationRef = useRef('')
   const serverURL = getCurrentServerURL()
 
+  const handlePrintAndSave = async () => {
+    if (cart.length === 0) return alert('Cart is empty')
+    if (!selectedLocation) return alert('No location selected')
+    if (!isPrinterConfigured()) return alert('No printer configured. Go to Settings → Printer to set up.')
+
+    if (dueAmount > 0 && (!selectedCustomer || selectedCustomer.isWalkIn)) {
+      return alert('Please select a real customer for partial/credit payment (not walk-in)')
+    }
+
+    let buyerId = selectedCustomer?.id
+    if (!buyerId) {
+      try {
+        const res = await api.get('/api/customers?search=Walk-in&include_walkin=1')
+        const walkIn = res.data.customers?.find(c => c.name === 'Walk-in Customer')
+        if (walkIn) {
+          buyerId = walkIn.id
+        } else {
+          const createRes = await api.post('/api/customers', { name: 'Walk-in Customer', phone: '0000000000' })
+          if (createRes.data.success) buyerId = createRes.data.id
+        }
+      } catch {
+        return alert('Failed to set up walk-in customer')
+      }
+    }
+
+    setPrinting(true)
+    try {
+      // 1. Save order first
+      const payload = {
+        buyer_id: buyerId,
+        location_id: selectedLocation,
+        discount_amount: discount,
+        received_amount: received,
+        payment_method: paymentMode,
+        use_advance: useAdvance && customerAdvance > 0,
+        notes: null,
+        items: cart.map(item => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+          selling_price: item.selling_price,
+          tax_percent: item.tax_percent || 0,
+          discount_percent: 0,
+        }))
+      }
+
+      const res = await api.post('/api/orders', payload)
+      if (!res.data.success) {
+        return alert(res.data.message || 'Failed to create sale')
+      }
+
+      const invoiceId = res.data.invoice_id
+
+      // 2. Print receipt with invoice number
+      try {
+        const settings = getPrinterSettings()
+        const totalQty = cart.reduce((sum, item) => sum + item.quantity, 0)
+        const receiptData = buildCartReceiptData({
+          cart,
+          subtotal,
+          taxTotal,
+          discount,
+          total,
+          received,
+          dueAmount,
+          customerName: selectedCustomer?.name || 'Walk-in Customer',
+          paymentMode,
+          invoiceId,
+          totalItems: cart.length,
+          totalQty,
+        }, settings)
+        await printReceipt(receiptData)
+      } catch (printErr) {
+        alert(`Order saved (Invoice: ${invoiceId}) but printing failed: ${printErr.message}`)
+      }
+
+      // 3. Show result and clear
+      let msg = `Sale completed! Invoice: ${invoiceId}`
+      if (res.data.advance_used > 0) msg += `\n₹${res.data.advance_used.toFixed(2)} deducted from advance balance`
+      if (res.data.debt_cleared > 0) msg += `\n₹${res.data.debt_cleared.toFixed(2)} applied to clear existing debts`
+      if (res.data.advance_saved > 0) msg += `\n₹${res.data.advance_saved.toFixed(2)} saved as advance balance`
+      alert(msg)
+
+      setCart([])
+      clearCustomer()
+      setPaymentMode('cash')
+      setReceivedAmount('')
+      setDiscountAmount('')
+      loadProducts('')
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to create sale')
+    } finally {
+      setPrinting(false)
+    }
+  }
+
   useEffect(() => {
     loadCustomers()
-    // Load locations first, then products with correct location
     const init = async () => {
       try {
         const res = await api.get('/api/locations')
@@ -107,11 +217,19 @@ const BillingPage = () => {
       e.preventDefault()
       try {
         const res = await api.get(`/api/products/barcode/${encodeURIComponent(searchQuery.trim())}`)
-        if (res.data.success && res.data.product) {
-          addToCart(res.data.product)
-          setSearchQuery('')
-          loadProducts('')
-          return
+        if (res.data.success) {
+          if (res.data.multiple) {
+            setBarcodeProducts(res.data.products)
+            setBarcodePickerOpen(true)
+            setSearchQuery('')
+            return
+          }
+          if (res.data.product) {
+            addToCart(res.data.product)
+            setSearchQuery('')
+            loadProducts('')
+            return
+          }
         }
       } catch {}
       loadProducts(searchQuery)
@@ -150,6 +268,38 @@ const BillingPage = () => {
     })
   }, [])
 
+  const handleBarcodeScanned = useCallback(async (barcode, statusCallback) => {
+    try {
+      const res = await api.get(`/api/products/barcode/${encodeURIComponent(barcode)}`)
+      if (res.data.success) {
+        if (res.data.multiple) {
+          setBarcodeProducts(res.data.products)
+          setBarcodePickerOpen(true)
+          setPendingScanCallback(() => statusCallback)
+          return
+        }
+        if (res.data.product) {
+          addToCart(res.data.product)
+          statusCallback(true, res.data.product.name)
+          return
+        }
+      }
+      statusCallback(false)
+    } catch {
+      statusCallback(false)
+    }
+  }, [addToCart])
+
+  const pickBarcodeProduct = (product) => {
+    addToCart(product)
+    setBarcodePickerOpen(false)
+    setBarcodeProducts([])
+    if (pendingScanCallback) {
+      pendingScanCallback(true, product.name)
+      setPendingScanCallback(null)
+    }
+  }
+
   const updateQuantity = (productId, delta) => {
     setCart(prev => prev.map(item => {
       if (item.product_id !== productId) return item
@@ -175,29 +325,42 @@ const BillingPage = () => {
   }, 0)
   const discount = Number(discountAmount) || 0
   const total = Math.max(0, subtotal + taxTotal - discount)
-  const received = receivedAmount === '' ? total : Math.min(Number(receivedAmount) || 0, total)
+  const received = receivedAmount === '' ? total : Math.max(0, Number(receivedAmount) || 0)
   const dueAmount = Math.max(0, total - received)
+  const excessAmount = Math.max(0, received - total)
 
   const filteredCustomers = customers.filter(c =>
     c.name?.toLowerCase().includes(customerSearch.toLowerCase()) ||
     c.phone?.includes(customerSearch)
   )
 
-  const selectCustomer = (customer) => {
+  const selectCustomer = async (customer) => {
     setSelectedCustomer(customer)
     setCustomerSearch(customer.name)
     setShowCustomerDropdown(false)
+    // Fetch advance balance
+    try {
+      const res = await api.get(`/api/customers/${customer.id}`)
+      if (res.data.success) {
+        setCustomerAdvance(res.data.customer.advance_balance || 0)
+        setUseAdvance(false)
+      }
+    } catch { setCustomerAdvance(0) }
   }
 
   const selectWalkIn = () => {
     setSelectedCustomer({ id: null, name: 'Walk-in Customer', phone: '', isWalkIn: true })
     setCustomerSearch('Walk-in Customer')
     setShowCustomerDropdown(false)
+    setCustomerAdvance(0)
+    setUseAdvance(false)
   }
 
   const clearCustomer = () => {
     setSelectedCustomer(null)
     setCustomerSearch('')
+    setCustomerAdvance(0)
+    setUseAdvance(false)
   }
 
   const closeCustomerModal = () => {
@@ -236,7 +399,7 @@ const BillingPage = () => {
     let buyerId = selectedCustomer?.id
     if (!buyerId) {
       try {
-        const res = await api.get('/api/customers?search=Walk-in')
+        const res = await api.get('/api/customers?search=Walk-in&include_walkin=1')
         const walkIn = res.data.customers?.find(c => c.name === 'Walk-in Customer')
         if (walkIn) {
           buyerId = walkIn.id
@@ -257,6 +420,7 @@ const BillingPage = () => {
         discount_amount: discount,
         received_amount: received,
         payment_method: paymentMode,
+        use_advance: useAdvance && customerAdvance > 0,
         notes: null,
         items: cart.map(item => ({
           product_id: item.product_id,
@@ -269,7 +433,17 @@ const BillingPage = () => {
 
       const res = await api.post('/api/orders', payload)
       if (res.data.success) {
-        alert(`Sale completed! Invoice: ${res.data.invoice_id}`)
+        let msg = `Sale completed! Invoice: ${res.data.invoice_id}`
+        if (res.data.advance_used > 0) {
+          msg += `\n₹${res.data.advance_used.toFixed(2)} deducted from advance balance`
+        }
+        if (res.data.debt_cleared > 0) {
+          msg += `\n₹${res.data.debt_cleared.toFixed(2)} applied to clear existing debts`
+        }
+        if (res.data.advance_saved > 0) {
+          msg += `\n₹${res.data.advance_saved.toFixed(2)} saved as advance balance`
+        }
+        alert(msg)
         setCart([])
         clearCustomer()
         setPaymentMode('cash')
@@ -294,10 +468,36 @@ const BillingPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#E6FFFD] px-6 pb-6 pt-20">
-      <div className="flex gap-5 items-start">
+    <div className="min-h-screen bg-[#E6FFFD] px-3 sm:px-6 pb-6 pt-20">
+      {/* Mobile tab switcher */}
+      <div className="flex lg:hidden mb-4 rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm">
+        <button
+          type="button"
+          onClick={() => setMobileTab('products')}
+          className={`flex-1 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${
+            mobileTab === 'products' ? 'bg-[#008C83] text-white' : 'text-gray-500 hover:bg-gray-50'
+          }`}
+        >
+          Products
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileTab('cart')}
+          className={`flex-1 py-2.5 text-sm font-semibold transition-colors relative cursor-pointer ${
+            mobileTab === 'cart' ? 'bg-[#008C83] text-white' : 'text-gray-500 hover:bg-gray-50'
+          }`}
+        >
+          Cart
+          {cart.length > 0 && (
+            <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-orange-500 text-white text-[10px] font-bold">
+              {cart.reduce((s, i) => s + i.quantity, 0)}
+            </span>
+          )}
+        </button>
+      </div>
+      <div className="flex flex-col lg:flex-row gap-5 items-start">
         {/* LEFT: Products */}
-        <div className="flex-1 flex flex-col">
+        <div className={`flex-1 flex flex-col ${mobileTab === 'cart' ? 'hidden lg:flex' : 'flex'}`}>
           <div className="mb-4 flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 shadow-sm">
             <HiMiniMagnifyingGlass className="h-5 w-5 text-gray-400 flex-shrink-0" />
             <input
@@ -308,7 +508,7 @@ const BillingPage = () => {
               placeholder="Search products or scan barcode (Press Enter)..."
               className="w-full bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
             />
-            <button type="button" className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 duration-150">
+            <button type="button" onClick={() => setIsScannerOpen(true)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 duration-150 cursor-pointer">
               <HiOutlineQrCode className="h-5 w-5" />
             </button>
           </div>
@@ -368,7 +568,7 @@ const BillingPage = () => {
         </div>
 
         {/* RIGHT: Cart */}
-        <div className="w-[340px] flex-shrink-0 sticky top-20">
+        <div className={`flex-shrink-0 lg:w-[340px] w-full lg:sticky lg:top-20 ${mobileTab === 'products' ? 'hidden lg:block' : 'block'}`}>
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="p-3.5 border-b border-gray-100">
               <div className="flex gap-2">
@@ -424,7 +624,10 @@ const BillingPage = () => {
                             {c.phone && <p className="text-[11px] text-gray-400">{c.phone}</p>}
                           </div>
                           {c.total_debt > 0 && (
-                            <span className="ml-auto text-[11px] font-semibold text-red-500">₹{c.total_debt}</span>
+                            <span className="ml-auto text-[11px] font-semibold text-red-500 shrink-0">₹{c.total_debt}</span>
+                          )}
+                          {(c.advance_balance > 0 && (!c.total_debt || c.total_debt <= 0)) && (
+                            <span className="ml-auto text-[11px] font-semibold text-blue-500 shrink-0">+₹{c.advance_balance}</span>
                           )}
                         </button>
                       ))}
@@ -517,12 +720,31 @@ const BillingPage = () => {
               {/* Received Amount & Due */}
               {selectedCustomer && !selectedCustomer.isWalkIn && cart.length > 0 && (
                 <div className="mt-2 pt-2 border-t border-gray-100 space-y-2">
+                  {/* Advance balance info */}
+                  {customerAdvance > 0 && (
+                    <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-[11px] text-blue-500 font-medium">Advance Balance</p>
+                          <p className="text-sm font-bold text-blue-600">₹{customerAdvance.toFixed(2)}</p>
+                        </div>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={useAdvance}
+                            onChange={(e) => setUseAdvance(e.target.checked)}
+                            className="w-4 h-4 accent-blue-600 cursor-pointer"
+                          />
+                          <span className="text-[11px] text-blue-600 font-medium">Use</span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between gap-2 text-sm">
                     <span className="text-gray-500">Received ₹</span>
                     <input
                       type="number"
                       min={0}
-                      max={total}
                       value={receivedAmount}
                       onChange={(e) => setReceivedAmount(e.target.value)}
                       placeholder={total.toFixed(0)}
@@ -535,7 +757,13 @@ const BillingPage = () => {
                       <span className="text-red-500 font-bold">₹{dueAmount.toFixed(2)}</span>
                     </div>
                   )}
-                  {dueAmount <= 0 && receivedAmount !== '' && (
+                  {excessAmount > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-blue-500 font-medium">Excess (Debt/Advance)</span>
+                      <span className="text-blue-600 font-bold">+₹{excessAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {dueAmount <= 0 && excessAmount <= 0 && receivedAmount !== '' && (
                     <p className="text-[11px] text-green-600 font-medium">✓ Fully paid</p>
                   )}
                 </div>
@@ -565,9 +793,9 @@ const BillingPage = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-2 p-3.5 pt-2">
-              <button type="button" className="flex h-11 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-gray-50 text-sm font-semibold text-gray-500 hover:bg-gray-100 duration-150 cursor-pointer">
+              <button type="button" onClick={handlePrintAndSave} disabled={printing || submitting || cart.length === 0} className="flex h-11 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-gray-50 text-sm font-semibold text-gray-500 hover:bg-gray-100 duration-150 cursor-pointer disabled:opacity-50">
                 <BiPrinter className="h-4 w-4" />
-                Print
+                {printing ? 'Saving & Printing...' : 'Print & Save'}
               </button>
               <button
                 type="button"
@@ -576,7 +804,7 @@ const BillingPage = () => {
                 className="flex h-11 items-center justify-center gap-2 rounded-lg bg-[#008C83] text-sm font-semibold text-white hover:bg-[#00756E] duration-150 cursor-pointer disabled:opacity-50"
               >
                 <RiSecurePaymentLine className="h-4 w-4" />
-                {submitting ? 'Saving...' : dueAmount > 0 ? `Pay ₹${received.toFixed(0)} + Debt` : 'Pay & Save'}
+                {submitting ? 'Saving...' : dueAmount > 0 ? `Pay ₹${received.toFixed(0)} + Debt` : excessAmount > 0 ? `Pay ₹${total.toFixed(0)} + ₹${excessAmount.toFixed(0)} Extra` : 'Pay & Save'}
               </button>
             </div>
           </div>
@@ -636,6 +864,53 @@ const BillingPage = () => {
               >
                 Save & Select
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Barcode Scanner Modal */}
+      <BarcodeScanner
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onBarcodeScanned={handleBarcodeScanned}
+      />
+
+      {/* Multiple Products Picker Modal */}
+      {barcodePickerOpen && barcodeProducts.length > 0 && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-gray-800">Multiple Products Found</h3>
+              <button type="button" onClick={() => { setBarcodePickerOpen(false); setBarcodeProducts([]); setPendingScanCallback(null) }} className="p-1 text-gray-400 hover:text-gray-600 cursor-pointer">
+                <HiOutlineXMark className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-400 mb-3">Same barcode has multiple products. Select which one to add:</p>
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+              {barcodeProducts.map(product => {
+                const imgSrc = product.img_path ? `${serverURL}/api/products/image/${product.img_path}` : null
+                return (
+                  <button
+                    key={product.id}
+                    type="button"
+                    onClick={() => pickBarcodeProduct(product)}
+                    className="w-full flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-[#008C83] hover:bg-[#E6FFFD] duration-150 text-left cursor-pointer"
+                  >
+                    <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
+                      {imgSrc ? (
+                        <img src={imgSrc} alt={product.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-gray-300 text-[10px]">No img</div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{product.name}</p>
+                      <p className="text-xs text-gray-400">{product.product_code} · {product.unit} · Stock: {product.total_stock || 0}</p>
+                    </div>
+                    <p className="text-sm font-bold text-[#008C83]">₹{product.default_selling_price || 0}</p>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 'use client'
 import { usePathname } from 'next/navigation'
-import { MdDashboard } from "react-icons/md"
+import { MdDashboard, MdOutlineReceiptLong } from "react-icons/md"
 import { FaBox } from "react-icons/fa6"
 import { IoCartSharp } from "react-icons/io5"
 import { FaFileInvoiceDollar } from "react-icons/fa6";
@@ -16,41 +16,52 @@ import Link from 'next/link'
 import ClientTopAvatar from './ClientTopAvatar'
 import { logout } from '@/util/apiService'
 import { IoSettings } from "react-icons/io5";
+import { usePermissions } from '@/context/PermissionContext'
 
 const SideNav = ({ children }) => {
     const pathname = usePathname();
     const [hovered, setHovered] = useState(false);
+    const { hasAnyPermission, loading: permLoading } = usePermissions();
     if (!pathname.startsWith('/client')) {
         return <>{children}</>;
     }
 
-    const links = [
+    const allLinks = [
         {
-            name: 'Dashboard', path: '/client/dashboard', icon: <MdDashboard />
+            name: 'Dashboard', path: '/client/dashboard', icon: <MdDashboard />, perms: null
         },
         {
-            name: 'Inventory', path: '/client/inventory', icon: <FaBox />
+            name: 'Inventory', path: '/client/inventory', icon: <FaBox />, perms: ['inventory_view']
         },
         {
-            name: 'Supplier', path: '/client/supplier', icon: <RiTruckLine />
+            name: 'Supplier', path: '/client/supplier', icon: <RiTruckLine />, perms: ['supplier_view']
         },
         {
-            name: 'Purchases', path: '/client/purchase', icon: <IoCartSharp />
+            name: 'Purchases', path: '/client/purchase', icon: <IoCartSharp />, perms: ['purchase_view']
         },
         {
-            name: 'Billing', path: '/client/billing', icon: <FaFileInvoiceDollar />
+            name: 'Billing', path: '/client/billing', icon: <FaFileInvoiceDollar />, perms: ['billing']
         },
         {
-            name: 'Debts', path: '/client/debts', icon: <FaWallet />
+            name: 'Invoice', path: '/client/invoice', icon: <MdOutlineReceiptLong />, perms: ['invoice']
         },
         {
-            name: 'Reports', path: '/client/reports', icon: <TbReport />
+            name: 'Debts', path: '/client/debts', icon: <FaWallet />, perms: ['debts']
         },
-        { name: 'Customers', path: '/client/customer', icon: <HiMiniUserGroup /> },
         {
-            name: 'Settings', path: '/client/settings', icon: <IoSettings />
+            name: 'Reports', path: '/client/reports', icon: <TbReport />, perms: ['reports']
+        },
+        { name: 'Customers', path: '/client/customer', icon: <HiMiniUserGroup />, perms: ['customers'] },
+        {
+            name: 'Settings', path: '/client/settings', icon: <IoSettings />, perms: null
         }
     ]
+
+    // Filter links based on permissions (Dashboard & Settings always visible)
+    const links = allLinks.filter(link => {
+        if (!link.perms) return true; // no restriction
+        return hasAnyPermission(...link.perms);
+    });
 
     return (
         <>

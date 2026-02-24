@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { FaBox, FaRupeeSign, FaFileAlt } from 'react-icons/fa'
 import { FaArrowTrendUp, FaVanShuttle, FaRegClock } from 'react-icons/fa6'
 import { GoAlertFill } from 'react-icons/go'
@@ -7,7 +8,6 @@ import { IoWarningOutline, IoAddOutline } from 'react-icons/io5'
 import { FaShoppingCart } from 'react-icons/fa'
 import { BsFileEarmarkBarGraphFill } from 'react-icons/bs'
 import { HiMiniUserGroup } from 'react-icons/hi2'
-import Link from 'next/link'
 import api from '@/util/api'
 
 const money = (v) => `₹${Number(v || 0).toLocaleString('en-IN')}`
@@ -190,8 +190,10 @@ const Dashboard = () => {
                 <div key={sale.id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50">
                   <div className="p-2 rounded-lg bg-[#E8F5E9] text-[#4CAF50]"><FaFileAlt className="text-sm" /></div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-green-600">{sale.invoice_id}</p>
-                    <p className="text-[10px] text-gray-400">{sale.buyer_name || 'Walk-in'} · {new Date(sale.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</p>
+                    <p className="text-xs font-semibold text-green-600">
+                      <Link href={`/client/invoice?q=${sale.invoice_id}`} className="hover:underline">{sale.invoice_id}</Link>
+                    </p>
+                    <p className="text-[10px] text-gray-400">{sale.buyer_name || 'Walk-in'} · {new Date(sale.created_at + ' UTC').toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</p>
                   </div>
                   <p className="text-xs font-bold text-gray-700">{money(sale.final_amount)}</p>
                 </div>
@@ -248,7 +250,7 @@ const Dashboard = () => {
                   </div>
                   <div className="text-right shrink-0">
                     {act.amount != null && <p className="text-xs font-semibold text-gray-700">{money(act.amount)}</p>}
-                    <p className="text-[10px] text-gray-400">{new Date(act.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                    <p className="text-[10px] text-gray-400">{new Date(act.created_at + ' UTC').toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
                   </div>
                 </div>
               )

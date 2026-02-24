@@ -3,7 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../lib/database');
-const { JWT_SECRET } = require('../lib/authMiddleware');
+const { JWT_SECRET, verifyToken } = require('../lib/authMiddleware');
 
 router.post('/login', async (req, res) => {
   try {
@@ -97,4 +97,22 @@ router.post('/login', async (req, res) => {
   }
 });
 
+router.get('/verify', verifyToken, (req, res) => {
+  const { parsePermissions } = require('../lib/authMiddleware');
+  const perms = req.user.role_name === 'admin' ? ['all'] : parsePermissions(req.user.permissions);
+  res.status(200).json({
+    success: true,
+    message: 'Token is valid',
+    user: {
+      id: req.user.id,
+      name: req.user.name,
+      username: req.user.username,
+      phone: req.user.phone,
+      role_id: req.user.role_id,
+      role_name: req.user.role_name,
+      is_active: req.user.is_active,
+      permissions: perms
+    }
+  });
+});
 module.exports = router;

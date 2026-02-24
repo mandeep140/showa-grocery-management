@@ -2,8 +2,10 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { IoMdArrowBack } from "react-icons/io"
+import { HiOutlineQrCode } from 'react-icons/hi2'
 import Link from 'next/link'
 import api, { getCurrentServerURL } from '@/util/api'
+import BarcodeScanner from '@/component/BarcodeScanner'
 
 const Edit = () => {
     const params = useParams()
@@ -17,6 +19,7 @@ const Edit = () => {
     const [imageFile, setImageFile] = useState(null)
     const [oldImage, setOldImage] = useState(null)
     const fileRef = useRef(null)
+    const [scannerOpen, setScannerOpen] = useState(false)
 
     const [form, setForm] = useState({
         name: '', category_id: '', brand_id: '', unit: 'pcs',
@@ -236,7 +239,12 @@ const Edit = () => {
                         </span>
                         <span className='flex flex-col gap-2 w-full'>
                             <label className='text-sm font-light'>Barcode</label>
-                            <input value={form.barcode} onChange={(e) => update('barcode', e.target.value)} placeholder="9876543210123" className='px-4 py-2 border border-gray-300 rounded-lg' />
+                            <div className='flex gap-2'>
+                                <input value={form.barcode} onChange={(e) => update('barcode', e.target.value)} placeholder="9876543210123" className='px-4 py-2 border border-gray-300 rounded-lg flex-1' />
+                                <button type='button' onClick={() => setScannerOpen(true)} className='px-3 py-2 rounded-lg border border-[#008C83] text-[#008C83] hover:bg-[#E6FFFD] duration-150 cursor-pointer'>
+                                    <HiOutlineQrCode className='h-5 w-5' />
+                                </button>
+                            </div>
                         </span>
                         <span className='flex flex-col gap-2 w-full'>
                             <label className='text-sm font-light'>Description</label>
@@ -253,6 +261,16 @@ const Edit = () => {
                     </div>
                 </form>
             </div>
+
+            <BarcodeScanner
+                isOpen={scannerOpen}
+                onClose={() => setScannerOpen(false)}
+                onBarcodeScanned={(code, cb) => {
+                    update('barcode', code)
+                    setScannerOpen(false)
+                    cb(true, 'Barcode set: ' + code)
+                }}
+            />
         </div>
     )
 }

@@ -86,10 +86,6 @@ export function ReportTable({ content, pillStyles }) {
             <LuFileOutput className='h-3.5 w-3.5' />
             Export CSV
           </button>
-          <button className='inline-flex h-[37px] w-[86.65px] items-center justify-center gap-1 rounded-[10px] bg-[#2196F3] text-xs font-semibold text-white'>
-            <FiPrinter className='h-3.5 w-3.5' />
-            Print
-          </button>
         </div>
       </div>
 

@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { dbRun, dbGet, dbAll, logStockHistory } = require('../lib/stockHelper');
-const { verifyToken } = require('../lib/authMiddleware');
+const { verifyToken, requirePermission } = require('../lib/authMiddleware');
 
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requirePermission('purchase_view'), async (req, res) => {
   try {
     const { seller_id, start_date, end_date, payment_status } = req.query;
     let sql = `SELECT p.*, s.name as seller_name, s.company_name, l.name as location_name, u.name as created_by_name
@@ -27,7 +27,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/:id', verifyToken, async (req, res) => {
+router.get('/:id', verifyToken, requirePermission('purchase_view'), async (req, res) => {
   try {
     const purchase = await dbGet(
       `SELECT p.*, s.name as seller_name, s.company_name, l.name as location_name, u.name as created_by_name
@@ -56,7 +56,7 @@ router.get('/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, requirePermission('purchase_create'), async (req, res) => {
   try {
     const { invoice_number, seller_id, location_id, purchase_date, discount_amount, paid_amount, notes, items } = req.body;
 
@@ -84,56 +84,64 @@ router.post('/', verifyToken, async (req, res) => {
     if (paidAmt >= finalAmount) paymentStatus = 'paid';
     else if (paidAmt > 0) paymentStatus = 'partial';
 
-    const purchaseResult = await dbRun(
-      `INSERT INTO purchases (invoice_number, seller_id, location_id, total_amount, discount_amount, tax_amount, final_amount, payment_status, paid_amount, purchase_date, notes, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [invoice_number, seller_id, location_id, totalAmount, discount_amount || 0, taxAmount, finalAmount, paymentStatus, paidAmt, purchase_date, notes || null, req.user.id]
-    );
-
-    const purchaseId = purchaseResult.lastID;
-
-    for (const item of items) {
-      const batchNo = item.batch_no || `B-${purchaseId}-${item.product_id}`;
-
-      const batchResult = await dbRun(
-        `INSERT INTO batches (batch_no, product_id, purchase_id, location_id, expire_date, quantity_initial, quantity_remaining, buying_rate)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [batchNo, item.product_id, purchaseId, location_id, item.expire_date || null, item.quantity, item.quantity, item.buying_rate]
+    await dbRun('BEGIN');
+    try {
+      const purchaseResult = await dbRun(
+        `INSERT INTO purchases (invoice_number, seller_id, location_id, total_amount, discount_amount, tax_amount, final_amount, payment_status, paid_amount, purchase_date, notes, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [invoice_number, seller_id, location_id, totalAmount, discount_amount || 0, taxAmount, finalAmount, paymentStatus, paidAmt, purchase_date, notes || null, req.user.id]
       );
 
-      const batchId = batchResult.lastID;
-      const itemSubtotal = item.quantity * item.buying_rate;
-      const itemDiscount = itemSubtotal * (item.discount_percent || 0) / 100;
+      const purchaseId = purchaseResult.lastID;
 
-      await dbRun(
-        `INSERT INTO purchase_items (purchase_id, product_id, batch_id, quantity, buying_rate, tax_percent, discount_percent, subtotal)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [purchaseId, item.product_id, batchId, item.quantity, item.buying_rate, item.tax_percent || 0, item.discount_percent || 0, itemSubtotal - itemDiscount]
-      );
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const batchNo = item.batch_no || `B-${purchaseId}-${item.product_id}-${i}`;
 
-      await logStockHistory({
-        productId: item.product_id,
-        batchId: batchId,
-        locationId: location_id,
-        referenceType: 'purchase',
-        referenceId: purchaseId,
-        quantityBefore: 0,
-        quantityChange: item.quantity,
-        quantityAfter: item.quantity,
-        movementType: 'in',
-        notes: `Purchase ${invoice_number}`,
-        createdBy: req.user.id
-      });
+        const batchResult = await dbRun(
+          `INSERT INTO batches (batch_no, product_id, purchase_id, location_id, expire_date, quantity_initial, quantity_remaining, buying_rate)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [batchNo, item.product_id, purchaseId, location_id, item.expire_date || null, item.quantity, item.quantity, item.buying_rate]
+        );
+
+        const batchId = batchResult.lastID;
+        const itemSubtotal = item.quantity * item.buying_rate;
+        const itemDiscount = itemSubtotal * (item.discount_percent || 0) / 100;
+
+        await dbRun(
+          `INSERT INTO purchase_items (purchase_id, product_id, batch_id, quantity, buying_rate, tax_percent, discount_percent, subtotal)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [purchaseId, item.product_id, batchId, item.quantity, item.buying_rate, item.tax_percent || 0, item.discount_percent || 0, itemSubtotal - itemDiscount]
+        );
+
+        await logStockHistory({
+          productId: item.product_id,
+          batchId: batchId,
+          locationId: location_id,
+          referenceType: 'purchase',
+          referenceId: purchaseId,
+          quantityBefore: 0,
+          quantityChange: item.quantity,
+          quantityAfter: item.quantity,
+          movementType: 'in',
+          notes: `Purchase ${invoice_number}`,
+          createdBy: req.user.id
+        });
+      }
+
+      await dbRun('COMMIT');
+      res.status(201).json({ success: true, message: 'Purchase created', id: purchaseId });
+    } catch (txError) {
+      await dbRun('ROLLBACK').catch(() => { });
+      throw txError;
     }
-
-    res.status(201).json({ success: true, message: 'Purchase created', id: purchaseId });
   } catch (error) {
     if (error.message.includes('UNIQUE')) return res.status(400).json({ success: false, message: 'Invoice number already exists' });
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-router.put('/:id', verifyToken, async (req, res) => {
+router.put('/:id', verifyToken, requirePermission('purchase_create'), async (req, res) => {
   try {
     const { discount_amount, paid_amount, notes } = req.body;
     const purchase = await dbGet(`SELECT * FROM purchases WHERE id = ?`, [req.params.id]);
@@ -157,7 +165,7 @@ router.put('/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.delete('/:id', verifyToken, async (req, res) => {
+router.delete('/:id', verifyToken, requirePermission('purchase_delete'), async (req, res) => {
   try {
     const purchase = await dbGet(`SELECT * FROM purchases WHERE id = ?`, [req.params.id]);
     if (!purchase) return res.status(404).json({ success: false, message: 'Purchase not found' });
