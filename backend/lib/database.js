@@ -461,12 +461,13 @@ function initDatabase() {
     db.run(`CREATE INDEX IF NOT EXISTS idx_products_name ON products(name)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_products_code ON products(product_code)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_products_active_name ON products(is_active, name)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_batches_product_remaining ON batches(product_id, quantity_remaining)`);
 
-    // Migration: Remove unique constraint on barcode (allow multiple products with same barcode)
     db.run(`DROP INDEX IF EXISTS sqlite_autoindex_products_2`);
-
-    // Migration: Add advance_balance column to buyers table
     db.run(`ALTER TABLE buyers ADD COLUMN advance_balance REAL DEFAULT 0`, () => {});
+    
     db.run(`CREATE INDEX IF NOT EXISTS idx_batches_product_location ON batches(product_id, location_id)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_batches_expire ON batches(expire_date)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_batches_remaining ON batches(quantity_remaining)`);

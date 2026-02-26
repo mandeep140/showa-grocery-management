@@ -51,7 +51,7 @@ api.interceptors.response.use(
           
           const errorMsg = message.includes('role') 
             ? 'Your role has been deactivated. Please contact administrator.'
-            : 'Your account has been deactivated. Please contact administrator.';
+            : message.includes('Store is deactivated') ? 'Your store has been deactivated by an agency or there is an server issue, please contact us.' : 'Your account has been deactivated. Please contact administrator.';
           
           alert(errorMsg);
           window.location.href = '/login';

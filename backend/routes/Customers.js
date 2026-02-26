@@ -172,7 +172,7 @@ router.get('/:id/debts', verifyToken, requirePermission(['customers', 'debts']),
     }
 
     const summary = await dbGet(
-      `SELECT COALESCE(SUM(amount_remaining + paid_amount), 0) as total_debt_amount,
+      `SELECT COALESCE(SUM(amount_remaining + paid_amount), 0) as total_debt,
         COALESCE(SUM(paid_amount), 0) as total_paid,
         COALESCE(SUM(amount_remaining), 0) as total_remaining
       FROM debts WHERE buyer_id = ? AND status IN ('pending', 'partial')`,

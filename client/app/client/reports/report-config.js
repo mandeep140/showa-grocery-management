@@ -37,7 +37,7 @@ export function buildSalesContent(orders, summary) {
   const cards = [
     { label: 'Total Orders', value: String(summary?.total_orders ?? 0), className: 'text-[#2b3b3f]' },
     { label: 'Gross Sales', value: money(summary?.gross_sales ?? summary?.total_sales), className: 'text-[#14a388]' },
-    { label: 'Profit', value: money(summary?.total_profit), className: 'text-[#22a061]' },
+    { label: 'Profit (Gross − Returns)', value: money(summary?.total_profit), className: 'text-[#22a061]' },
   ]
   if (summary?.total_returns > 0) {
     cards.push({ label: 'Returns', value: `-${money(summary.total_returns)}`, className: 'text-[#ef5c55]' })

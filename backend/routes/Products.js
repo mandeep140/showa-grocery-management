@@ -39,7 +39,6 @@ router.get('/image/:filename', (req, res) => {
   const filePath = path.join(IMAGES_DIR, req.params.filename);
   if (!fs.existsSync(filePath)) return res.status(404).json({ success: false, message: 'Image not found' });
   
-  // Set proper content-type based on extension
   const ext = path.extname(req.params.filename).toLowerCase();
   const contentTypes = {
     '.jpg': 'image/jpeg',
@@ -66,47 +65,57 @@ router.delete('/image/:filename', verifyToken, requirePermission('inventory_dele
 
 router.get('/', verifyToken, requirePermission(['inventory_view', 'billing', 'purchase_create']), async (req, res) => {
   try {
-    const { category_id, brand_id, search, active, location_id } = req.query;
+    const { category_id, brand_id, search, active, location_id, page, limit: rawLimit } = req.query;
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(rawLimit) || 50));
+    const offset = (pageNum - 1) * limit;
+
+    // Build WHERE clause
+    let where = ` WHERE 1=1`;
+    const whereParams = [];
+
+    if (active !== undefined) {
+      where += ` AND p.is_active = ?`;
+      whereParams.push(active === 'false' ? 0 : 1);
+    } else {
+      where += ` AND p.is_active = 1`;
+    }
+
+    if (category_id) {
+      where += ` AND p.category_id = ?`;
+      whereParams.push(category_id);
+    }
+
+    if (brand_id) {
+      where += ` AND p.brand_id = ?`;
+      whereParams.push(brand_id);
+    }
+
+    if (search) {
+      where += ` AND (p.name LIKE ? OR p.product_code LIKE ? OR p.barcode LIKE ?)`;
+      const q = `%${search}%`;
+      whereParams.push(q, q, q);
+    }
+
+    const countRow = await dbGet(`SELECT COUNT(*) as total FROM products p${where}`, whereParams);
+    const total = countRow?.total || 0;
+
+    const joinBatch = location_id ? ' AND bt.location_id = ?' : '';
     let sql = `SELECT p.*, c.name as category_name, b.name as brand_name, 
       COALESCE(SUM(bt.quantity_remaining), 0) as total_stock
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN brands b ON p.brand_id = b.id
-      LEFT JOIN batches bt ON p.id = bt.product_id${location_id ? ' AND bt.location_id = ?' : ''}
-      WHERE 1=1`;
+      LEFT JOIN batches bt ON p.id = bt.product_id${joinBatch}
+      ${where}
+      GROUP BY p.id ORDER BY p.name
+      LIMIT ? OFFSET ?`;
     const params = [];
-    
-    if (location_id) {
-      params.push(location_id);
-    }
-
-    if (active !== undefined) {
-      sql += ` AND p.is_active = ?`;
-      params.push(active === 'false' ? 0 : 1);
-    } else {
-      sql += ` AND p.is_active = 1`;
-    }
-
-    if (category_id) {
-      sql += ` AND p.category_id = ?`;
-      params.push(category_id);
-    }
-
-    if (brand_id) {
-      sql += ` AND p.brand_id = ?`;
-      params.push(brand_id);
-    }
-
-    if (search) {
-      sql += ` AND (p.name LIKE ? OR p.product_code LIKE ? OR p.barcode LIKE ?)`;
-      const q = `%${search}%`;
-      params.push(q, q, q);
-    }
-
-    sql += ` GROUP BY p.id ORDER BY p.name`;
+    if (location_id) params.push(location_id);
+    params.push(...whereParams, limit, offset);
 
     const rows = await dbAll(sql, params);
-    res.json({ success: true, products: rows });
+    res.json({ success: true, products: rows, total, page: pageNum, limit, totalPages: Math.ceil(total / limit) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

@@ -1,6 +1,89 @@
 const jwt = require('jsonwebtoken');
+const fs = require('fs');
+const path = require('path');
 const db = require('./database');
 const JWT_SECRET = process.env.JWT_SECRET;
+
+const CONFIG_PATH = path.join(__dirname, '../config.json');
+let _cachedStoreStatus = null;   
+let _lastCheckTime = 0;
+const CHECK_INTERVAL = 1 * 60 * 1000; 
+
+function readConfig() {
+  try {
+    const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function writeConfig(config) {
+  try {
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 4), 'utf-8');
+  } catch (err) {
+    console.error('Failed to write config.json:', err.message);
+  }
+}
+
+async function checkStoreStatus() {
+  const now = Date.now();
+
+  if (_cachedStoreStatus && (now - _lastCheckTime) < CHECK_INTERVAL) {
+    return _cachedStoreStatus;
+  }
+
+  const config = readConfig();
+  if (!config || !config.server || !config.server.url) {
+    return _cachedStoreStatus || 'active';
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+
+    const response = await fetch(config.server.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        store_id: config.store?.id,
+        store_name: config.store?.name,
+        timestamp: new Date().toISOString(),
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+    const data = await response.json();
+
+    if (data.message === 'active' || data.message === 'inactive') {
+      console.log(`Store status: ${data.message} (verified at ${config.server.lastVerified})`);
+      _cachedStoreStatus = data.message;
+      _lastCheckTime = now;
+      config.server.status = data.message;
+      config.server.lastVerified = new Date().toISOString();
+      writeConfig(config);
+
+      return _cachedStoreStatus;
+    }
+    return config.server.status || _cachedStoreStatus || 'active';
+  } catch (err) {
+    console.error('Store verification failed (using last known status):', err.message);
+    if (config.server.status) {
+      _cachedStoreStatus = config.server.status;
+      _lastCheckTime = now; 
+      return config.server.status;
+    }
+    return _cachedStoreStatus || 'active';
+  }
+}
+
+(function initStoreStatus() {
+  const config = readConfig();
+  if (config?.server?.status) {
+    _cachedStoreStatus = config.server.status;
+  }
+})();
 
 const verifyToken = async (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1];
@@ -13,6 +96,15 @@ const verifyToken = async (req, res, next) => {
   }
 
   try {
+    const storeStatus = await checkStoreStatus();
+    if (storeStatus === 'inactive') {
+      return res.status(403).json({
+        success: false,
+        message: 'Store is deactivated. Please contact support.',
+        code: 'STORE_INACTIVE'
+      });
+    }
+
     const decoded = jwt.verify(token, JWT_SECRET);
     if (!decoded || !decoded.id) {
       return res.status(401).json({
@@ -57,6 +149,8 @@ const verifyToken = async (req, res, next) => {
       });
     }
 
+    updateLastLogin();
+
     req.user = user;
     next();
   } catch (error) {
@@ -66,6 +160,21 @@ const verifyToken = async (req, res, next) => {
     });
   }
 };
+
+let _lastLoginUpdateTime = 0;
+function updateLastLogin() {
+  const now = Date.now();
+  if (now - _lastLoginUpdateTime < 60000) return; 
+  _lastLoginUpdateTime = now;
+  try {
+    const config = readConfig();
+    if (config) {
+      if (!config.store) config.store = {};
+      config.store.lastLogin = new Date().toISOString();
+      writeConfig(config);
+    }
+  } catch {}
+}
 
 const isAdmin = async (req, res, next) => {
   try {

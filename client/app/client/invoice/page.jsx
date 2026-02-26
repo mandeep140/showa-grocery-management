@@ -237,8 +237,8 @@ function InvoicePageContent() {
                 <div className="rounded-xl bg-red-50 border border-red-100 p-4">
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                     <div>
-                      <p className="text-xs text-gray-400">Original Debt</p>
-                      <p className="font-bold text-red-600">{fmt(order.debt.original_amount)}</p>
+                      <p className="text-xs text-gray-400">Debt Amount</p>
+                      <p className="font-bold text-red-600">{fmt(order.debt.total_amount)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-400">Paid</p>
@@ -246,7 +246,7 @@ function InvoicePageContent() {
                     </div>
                     <div>
                       <p className="text-xs text-gray-400">Remaining</p>
-                      <p className="font-bold text-red-600">{fmt(order.debt.remaining_amount)}</p>
+                      <p className="font-bold text-red-600">{fmt(order.debt.amount_remaining)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-400">Status</p>

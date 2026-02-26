@@ -60,6 +60,11 @@ const BillingPage = () => {
   const [useAdvance, setUseAdvance] = useState(false)
   const [customerAdvance, setCustomerAdvance] = useState(0)
   const [printing, setPrinting] = useState(false)
+  const [weightModal, setWeightModal] = useState({ open: false, product: null, weight: '' })
+  const [productPage, setProductPage] = useState(1)
+  const [hasMoreProducts, setHasMoreProducts] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [totalProducts, setTotalProducts] = useState(0)
 
   const searchTimeout = useRef(null)
   const selectedLocationRef = useRef('')
@@ -187,14 +192,33 @@ const BillingPage = () => {
     init()
   }, [])
 
-  const loadProducts = async (search = '', locationId) => {
+  const PRODUCTS_PER_PAGE = 50
+
+  const loadProducts = async (search = '', locationId, page = 1, append = false) => {
     try {
+      if (page > 1) setLoadingMore(true)
       const locId = locationId !== undefined ? locationId : selectedLocationRef.current
-      let url = search ? `/api/products?search=${encodeURIComponent(search)}` : '/api/products'
-      if (locId) url += `${search ? '&' : '?'}location_id=${locId}`
+      let url = `/api/products?limit=${PRODUCTS_PER_PAGE}&page=${page}`
+      if (search) url += `&search=${encodeURIComponent(search)}`
+      if (locId) url += `&location_id=${locId}`
       const res = await api.get(url)
-      if (res.data.success) setProducts(res.data.products)
+      if (res.data.success) {
+        if (append) {
+          setProducts(prev => [...prev, ...res.data.products])
+        } else {
+          setProducts(res.data.products)
+        }
+        setProductPage(page)
+        setTotalProducts(res.data.total || 0)
+        setHasMoreProducts(page < (res.data.totalPages || 1))
+      }
     } catch (err) { console.error('Failed to load products:', err) }
+    finally { setLoadingMore(false) }
+  }
+
+  const loadMoreProducts = () => {
+    if (!hasMoreProducts || loadingMore) return
+    loadProducts(searchQuery, undefined, productPage + 1, true)
   }
 
   const loadCustomers = async () => {
@@ -213,7 +237,7 @@ const BillingPage = () => {
   const handleSearch = (value) => {
     setSearchQuery(value)
     if (searchTimeout.current) clearTimeout(searchTimeout.current)
-    searchTimeout.current = setTimeout(() => loadProducts(value), 300)
+    searchTimeout.current = setTimeout(() => loadProducts(value, undefined, 1, false), 300)
   }
 
   const handleSearchKeyDown = async (e) => {
@@ -240,7 +264,15 @@ const BillingPage = () => {
     }
   }
 
+  const WEIGHT_UNITS = ['kg', 'g', 'gram', 'grams', 'ml', 'ltr', 'l', 'litre', 'liter']
+  const isWeightBased = (unit) => WEIGHT_UNITS.includes((unit || '').toLowerCase())
+
   const addToCart = useCallback((product) => {
+    // If weight-based, show weight prompt instead of adding directly
+    if (isWeightBased(product.unit)) {
+      setWeightModal({ open: true, product, weight: '' })
+      return
+    }
     setCart(prev => {
       const existing = prev.find(c => c.product_id === product.id)
       if (existing) {
@@ -271,6 +303,43 @@ const BillingPage = () => {
       }]
     })
   }, [])
+
+  const addWeightToCart = () => {
+    const { product, weight } = weightModal
+    const qty = parseFloat(weight)
+    if (!qty || qty <= 0 || !product) return
+    setCart(prev => {
+      const existing = prev.find(c => c.product_id === product.id)
+      if (existing) {
+        const newQty = existing.quantity + qty
+        const isBulk = product.bulk_quantity && newQty >= product.bulk_quantity && product.bulk_price
+        return prev.map(c => c.product_id === product.id ? {
+          ...c,
+          quantity: parseFloat(newQty.toFixed(3)),
+          selling_price: isBulk ? product.bulk_price : product.default_selling_price,
+          is_bulk: isBulk
+        } : c)
+      }
+      const isBulk = product.bulk_quantity && qty >= product.bulk_quantity && product.bulk_price
+      return [...prev, {
+        product_id: product.id,
+        name: product.name,
+        selling_price: isBulk ? product.bulk_price : (product.default_selling_price || 0),
+        tax_percent: product.tax_percent || 0,
+        quantity: qty,
+        stock: product.total_stock || 0,
+        unit: product.unit || 'pcs',
+        img_path: product.img_path || null,
+        product_code: product.product_code || '',
+        bulk_quantity: product.bulk_quantity || null,
+        bulk_price: product.bulk_price || null,
+        default_selling_price: product.default_selling_price || 0,
+        is_bulk: isBulk,
+        is_weight: true
+      }]
+    })
+    setWeightModal({ open: false, product: null, weight: '' })
+  }
 
   const handleBarcodeScanned = useCallback(async (barcode, statusCallback) => {
     try {
@@ -307,11 +376,30 @@ const BillingPage = () => {
   const updateQuantity = (productId, delta) => {
     setCart(prev => prev.map(item => {
       if (item.product_id !== productId) return item
-      const newQty = Math.max(1, item.quantity + delta)
+      const isWeight = item.is_weight || isWeightBased(item.unit)
+      const step = isWeight ? 0.1 : 1
+      const min = isWeight ? 0.1 : 1
+      const newQty = parseFloat(Math.max(min, item.quantity + delta * step).toFixed(3))
       const isBulk = item.bulk_quantity && newQty >= item.bulk_quantity && item.bulk_price
       return { 
         ...item, 
         quantity: newQty,
+        selling_price: isBulk ? item.bulk_price : item.default_selling_price,
+        is_bulk: isBulk
+      }
+    }))
+  }
+
+  const setDirectQuantity = (productId, value) => {
+    setCart(prev => prev.map(item => {
+      if (item.product_id !== productId) return item
+      if (value === '') return { ...item, quantity: '' }
+      const isWeight = item.is_weight || isWeightBased(item.unit)
+      const qty = isWeight ? Math.max(0.001, parseFloat(Number(value).toFixed(3))) : Math.max(1, Math.floor(Number(value) || 1))
+      const isBulk = item.bulk_quantity && qty >= item.bulk_quantity && item.bulk_price
+      return { 
+        ...item, 
+        quantity: qty,
         selling_price: isBulk ? item.bulk_price : item.default_selling_price,
         is_bulk: isBulk
       }
@@ -569,6 +657,20 @@ const BillingPage = () => {
               <div className="col-span-full py-16 text-center text-gray-400 text-sm">No products found</div>
             )}
           </div>
+          {/* Load More / Product Count */}
+          <div className="mt-3 flex items-center justify-center gap-3">
+            <p className="text-xs text-gray-400">Showing {products.length} of {totalProducts}</p>
+            {hasMoreProducts && (
+              <button
+                type="button"
+                onClick={loadMoreProducts}
+                disabled={loadingMore}
+                className="px-4 py-1.5 text-xs font-semibold text-[#008C83] bg-white border border-[#008C83]/30 rounded-lg hover:bg-[#E6FFFD] duration-150 disabled:opacity-50 cursor-pointer"
+              >
+                {loadingMore ? 'Loading...' : 'Load More'}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* RIGHT: Cart */}
@@ -666,7 +768,9 @@ const BillingPage = () => {
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-gray-800 truncate">{item.name}</p>
-                          <p className="text-[12px] text-gray-400 mt-0.5">₹{item.selling_price} × {item.quantity}</p>
+                          <p className="text-[12px] text-gray-400 mt-0.5">
+                            ₹{item.selling_price}{isWeightBased(item.unit) ? `/${item.unit}` : ''} × {item.quantity}{isWeightBased(item.unit) ? item.unit : ''}
+                          </p>
                           {item.is_bulk && (
                             <p className="text-[10px] text-green-600 font-medium mt-0.5">✓ Bulk price applied</p>
                           )}
@@ -675,7 +779,15 @@ const BillingPage = () => {
                           <button type="button" onClick={() => updateQuantity(item.product_id, -1)} className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 bg-white text-gray-400 hover:border-gray-300 hover:text-gray-600 cursor-pointer">
                             <HiMinusSmall className="h-3.5 w-3.5" />
                           </button>
-                          <span className="text-sm font-medium w-5 text-center">{item.quantity}</span>
+                          <input
+                            type="number"
+                            min={isWeightBased(item.unit) ? 0.001 : 1}
+                            step={isWeightBased(item.unit) ? 0.01 : 1}
+                            value={item.quantity}
+                            onChange={(e) => setDirectQuantity(item.product_id, e.target.value)}
+                            onBlur={(e) => { if (!e.target.value || Number(e.target.value) < (isWeightBased(item.unit) ? 0.001 : 1)) setDirectQuantity(item.product_id, isWeightBased(item.unit) ? 0.1 : 1) }}
+                            className="w-12 text-center text-sm font-medium border border-gray-200 rounded px-0.5 py-0.5 outline-none focus:border-[#008C83] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
                           <button type="button" onClick={() => updateQuantity(item.product_id, 1)} className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 bg-white text-gray-400 hover:border-gray-300 hover:text-gray-600 cursor-pointer">
                             <HiPlusSmall className="h-3.5 w-3.5" />
                           </button>
@@ -916,6 +1028,67 @@ const BillingPage = () => {
                 )
               })}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Weight Input Modal */}
+      {weightModal.open && weightModal.product && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-gray-800">Enter Weight</h3>
+              <button type="button" onClick={() => setWeightModal({ open: false, product: null, weight: '' })} className="p-1 text-gray-400 hover:text-gray-600 cursor-pointer">
+                <HiOutlineXMark className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mb-4">
+              <p className="text-sm font-medium text-gray-700">{weightModal.product.name}</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                ₹{weightModal.product.default_selling_price}/{weightModal.product.unit || 'kg'} · Stock: {weightModal.product.total_stock || 0} {weightModal.product.unit || 'kg'}
+              </p>
+            </div>
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Weight ({weightModal.product.unit || 'kg'})</label>
+              <input
+                type="number"
+                min={0.001}
+                step={0.01}
+                autoFocus
+                value={weightModal.weight}
+                onChange={(e) => setWeightModal(prev => ({ ...prev, weight: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === 'Enter') addWeightToCart() }}
+                placeholder={`e.g. 0.5 ${weightModal.product.unit || 'kg'}`}
+                className="h-11 w-full rounded-lg border border-gray-200 px-3.5 text-sm outline-none focus:border-[#008C83]"
+              />
+              {weightModal.weight && Number(weightModal.weight) > 0 && (
+                <p className="text-xs text-gray-400 mt-1.5">
+                  Total: <span className="font-semibold text-[#008C83]">₹{(weightModal.product.default_selling_price * Number(weightModal.weight)).toFixed(2)}</span>
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {[0.25, 0.5, 1, 2, 5].map(q => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => setWeightModal(prev => ({ ...prev, weight: String(q) }))}
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-lg border cursor-pointer duration-150 ${
+                    weightModal.weight === String(q) ? 'border-[#008C83] bg-[#E6FFFD] text-[#008C83]' : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                  }`}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={addWeightToCart}
+              disabled={!weightModal.weight || Number(weightModal.weight) <= 0}
+              className="mt-4 h-11 w-full rounded-lg bg-[#008C83] text-sm font-semibold text-white hover:bg-[#007571] duration-150 disabled:opacity-50 cursor-pointer"
+            >
+              Add to Cart
+            </button>
           </div>
         </div>
       )}

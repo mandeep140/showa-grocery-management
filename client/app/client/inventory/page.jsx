@@ -13,7 +13,7 @@ import api from '@/util/api'
 import { getServerURL } from '@/util/FindIP'
 
 const Inventory = () => {
-    const perPage = 10
+    const perPage = 20
     const [currentPage, setCurrentPage] = useState(1)
     const [products, setProducts] = useState([])
     const [categories, setCategories] = useState([])
@@ -21,16 +21,32 @@ const Inventory = () => {
     const [search, setSearch] = useState('')
     const [categoryFilter, setCategoryFilter] = useState('')
     const [locationFilter, setLocationFilter] = useState('')
+    const [totalProducts, setTotalProducts] = useState(0)
+    const [totalPages, setTotalPages] = useState(1)
+    const searchTimeout = React.useRef(null)
 
     useEffect(() => {
-        fetchProducts()
         fetchCategories()
     }, [])
 
-    const fetchProducts = async () => {
+    useEffect(() => {
+        fetchProducts()
+    }, [currentPage, categoryFilter, locationFilter])
+
+    const fetchProducts = async (searchVal) => {
         try {
-            const res = await api.get('/api/products')
-            if (res.data.success) setProducts(res.data.products)
+            setLoading(true)
+            const s = searchVal !== undefined ? searchVal : search
+            let url = `/api/products?limit=${perPage}&page=${currentPage}`
+            if (s) url += `&search=${encodeURIComponent(s)}`
+            if (categoryFilter) url += `&category_id=${categoryFilter}`
+            if (locationFilter) url += `&location_id=${locationFilter}`
+            const res = await api.get(url)
+            if (res.data.success) {
+                setProducts(res.data.products)
+                setTotalProducts(res.data.total || 0)
+                setTotalPages(res.data.totalPages || 1)
+            }
         } catch (err) {
             console.error('Failed to fetch products:', err)
         } finally {
@@ -45,6 +61,20 @@ const Inventory = () => {
         } catch (err) {}
     }
 
+    const handleSearch = (value) => {
+        setSearch(value)
+        if (searchTimeout.current) clearTimeout(searchTimeout.current)
+        searchTimeout.current = setTimeout(() => {
+            setCurrentPage(1)
+            fetchProducts(value)
+        }, 350)
+    }
+
+    const handleCategoryChange = (val) => {
+        setCategoryFilter(val)
+        setCurrentPage(1)
+    }
+
     const getImageURL = (path) => {
         if (!path) return null
         return `${getServerURL()}/api/products/image/${path}`
@@ -55,7 +85,7 @@ const Inventory = () => {
         try {
             const res = await api.delete(`/api/products/${id}`)
             if (res.data.success) {
-                setProducts(prev => prev.filter(p => p.id !== id))
+                fetchProducts()
             } else {
                 alert(res.data.message)
             }
@@ -63,18 +93,6 @@ const Inventory = () => {
             alert(err.response?.data?.message || 'Failed to delete')
         }
     }
-
-    const filtered = products.filter(p => {
-        const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.barcode && p.barcode.includes(search)) || (p.product_code && p.product_code.toLowerCase().includes(search.toLowerCase()))
-        const matchCat = !categoryFilter || String(p.category_id) === categoryFilter
-        const matchLocation = !locationFilter || String(p.location_id) === locationFilter
-        return matchSearch && matchCat && matchLocation
-    })
-
-    const paginatedData = filtered.slice((currentPage - 1) * perPage, currentPage * perPage)
-    const totalPages = Math.ceil(filtered.length / perPage)
-
-    useEffect(() => { setCurrentPage(1) }, [search, categoryFilter, locationFilter])
 
     const getPageNumbers = () => {
         const pages = []
@@ -116,10 +134,10 @@ const Inventory = () => {
             <div className='w-full h-20 bg-white rounded-lg flex items-center justify-between px-8'>
                 <span className='p-4 border border-gray-200 rounded-xl flex items-center justify-center w-[70%]'>
                     <CiSearch />
-                    <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder='Search by product name or barcode' className='ml-2 w-full h-full border-none outline-none' />
+                    <input type="text" value={search} onChange={(e) => handleSearch(e.target.value)} placeholder='Search by product name or barcode' className='ml-2 w-full h-full border-none outline-none' />
                 </span>
                 <div>
-                    <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className='ml-4 p-3 rounded-lg border border-gray-300'>
+                    <select value={categoryFilter} onChange={(e) => handleCategoryChange(e.target.value)} className='ml-4 p-3 rounded-lg border border-gray-300'>
                         <option value="">All Categories</option>
                         {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
@@ -144,7 +162,7 @@ const Inventory = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {paginatedData.map((item) => {
+                        {products.map((item) => {
                             const status = getStatus(item)
                             return (
                             <tr key={item.id} className={`border-t ${status.bg} duration-200`}>
@@ -173,14 +191,14 @@ const Inventory = () => {
                             </tr>
                             )
                         })}
-                        {paginatedData.length === 0 && (
+                        {products.length === 0 && (
                             <tr><td colSpan={8} className='p-10 text-center text-gray-400'>No products found</td></tr>
                         )}
                     </tbody>
                 </table>
                 {totalPages > 1 && (
                 <div className="pt-7 pb-4 px-4 rounded-b-lg flex justify-between items-center bg-[#FAFAFA]">
-                    <p className='font-light text-md tracking-wide'>showing {paginatedData.length} of {filtered.length} items</p>
+                    <p className='font-light text-md tracking-wide'>showing {products.length} of {totalProducts} items</p>
                     <div className='flex justify-center items-center gap-4'>
                         <button
                             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
