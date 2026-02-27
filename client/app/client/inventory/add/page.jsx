@@ -8,11 +8,11 @@ import Link from 'next/link';
 const Add = () => {
     const [expireHandling, setExpireHandling] = useState(false)
     return (
-        <div className='w-full min-h-screen px-15 py-20 bg-[#E6FFFD]'>
+        <div className='w-full min-h-screen bg-[#E6FFFD] px-4 py-20 sm:px-6 lg:px-10'>
             <Link href="/client/inventory" className='flex items-center mb-8 hover:text-gray-500 duration-200'> <IoMdArrowBack /> &nbsp; Back to inventory</Link>
             <h1 className='text-3xl font-bold mb-10'>Add Product</h1>
 
-            <div className='w-[70%] mx-auto rounded-xl bg-white p-6 '>
+            <div className='mx-auto w-full max-w-4xl rounded-xl bg-white p-6'>
                 <form className='flex flex-col gap-6'>
                     <div className='flex flex-col items-center gap-4'>
                         <p className='text-lg font-bold mb-4 mr-auto'>Basic information</p>
@@ -44,7 +44,7 @@ const Add = () => {
                             <label htmlFor="minimumStock" className='text-sm font-light'>Minimum stock level</label>
                             <input id="minimumStock" placeholder="20" className='px-4 py-2 border border-gray-300 rounded-lg' />
                         </span>
-                        <div className='w-full flex gap-3 items-center'>
+                        <div className='flex w-full flex-col items-center gap-3 sm:flex-row'>
                             <span className='flex flex-col gap-2 w-full'>
                                 <label htmlFor="bulkQuantity" className='text-sm font-light'>Bulk quantity*</label>
                                 <input id="bulkQuantity" placeholder="20" required className='px-4 py-2 border border-gray-300 rounded-lg' />
@@ -83,7 +83,7 @@ const Add = () => {
                             <input id="productCode" placeholder="9876543210123" required className='px-4 py-2 border border-gray-300 rounded-lg' />
                             <p className='text-xs text-gray-400 -mt-1'>Cannot be edited later</p>
                         </span>
-                        <div className='w-full flex gap-3 items-center'>
+                        <div className='flex w-full flex-col items-center gap-3 sm:flex-row'>
                             <span className='flex flex-col gap-2 w-full'>
                                 <label htmlFor="shopStock" className='text-sm font-light'>Shop stock*</label>
                                 <input id="shopStock" placeholder="45" required className='px-4 py-2 border border-gray-300 rounded-lg' />
@@ -95,7 +95,7 @@ const Add = () => {
                         </div>
 
                         <div className='w-full h-px bg-gray-200 my-3 rounded'></div>
-                        <div className='w-full flex items-center justify-between'>
+                        <div className='flex w-full flex-col-reverse items-stretch justify-between gap-3 sm:flex-row sm:items-center'>
                             <Link href="/client/inventory" className='px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 duration-150'>cancel</Link>
                             <button type='submit' className='px-6 py-2 bg-[#008C83] text-white rounded-lg hover:bg-[#007571] duration-200'>Add Product</button>
                         </div>
