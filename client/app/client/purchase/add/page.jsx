@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { IoMdArrowBack } from "react-icons/io"
 import { FiPlus, FiTrash2, FiSave, FiCheck } from "react-icons/fi"
 import { MdOutlineInventory } from "react-icons/md"
+import { IoChevronDown } from "react-icons/io5"
 import api from '@/util/api'
 import { useRouter } from 'next/navigation'
 
@@ -28,7 +29,11 @@ const AddPurchase = () => {
   const [sellers, setSellers] = useState([])
   const [locations, setLocations] = useState([])
   const [submitting, setSubmitting] = useState(false)
+  const [supplierDropdownOpen, setSupplierDropdownOpen] = useState(false)
+  const [locationDropdownOpen, setLocationDropdownOpen] = useState(false)
   const submittedRef = useRef(false)
+  const supplierDropdownRef = useRef(null)
+  const locationDropdownRef = useRef(null)
 
   const [formData, setFormData] = useState({
     seller_id: '',
@@ -59,10 +64,25 @@ const AddPurchase = () => {
       }
     }
     load()
+    const currentSearchTimeouts = searchTimeouts.current
+    const currentAbortControllers = abortControllers.current
     return () => {
-      Object.values(searchTimeouts.current).forEach(clearTimeout)
-      Object.values(abortControllers.current).forEach(c => c.abort())
+      Object.values(currentSearchTimeouts).forEach(clearTimeout)
+      Object.values(currentAbortControllers).forEach(c => c.abort())
     }
+  }, [])
+
+  useEffect(() => {
+    const handleOutside = (event) => {
+      if (supplierDropdownRef.current && !supplierDropdownRef.current.contains(event.target)) {
+        setSupplierDropdownOpen(false)
+      }
+      if (locationDropdownRef.current && !locationDropdownRef.current.contains(event.target)) {
+        setLocationDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutside)
+    return () => document.removeEventListener('mousedown', handleOutside)
   }, [])
 
   const updateItem = useCallback((key, updates) => {
@@ -149,6 +169,12 @@ const AddPurchase = () => {
   const getGrandTotal = () =>
     getSubtotal() + getTaxTotal() - (parseFloat(formData.discount_amount) || 0)
 
+  const selectedSupplier = sellers.find((s) => String(s.id) === String(formData.seller_id))
+  const selectedSupplierLabel = selectedSupplier
+    ? `${selectedSupplier.name}${selectedSupplier.company_name ? ` - ${selectedSupplier.company_name}` : ''}`
+    : 'Select supplier'
+  const selectedLocationLabel = locations.find((l) => String(l.id) === String(formData.location_id))?.name || 'Select location'
+
   const handleSubmit = useCallback(async (isDraft = false) => {
     if (submittedRef.current || submitting) return
     if (!formData.seller_id) return alert('Please select a supplier')
@@ -207,40 +233,67 @@ const AddPurchase = () => {
   }, [])
 
   return (
-    <form onSubmit={(e) => e.preventDefault()} className='w-full min-h-screen px-15 py-20 bg-[#E6FFFD]' onKeyDown={blockEnter}>
+    <form onSubmit={(e) => e.preventDefault()} className='w-full min-h-screen bg-[#E6FFFD] px-4 pb-8 pt-16 sm:px-8 sm:pb-10 sm:pt-10 lg:px-12 lg:py-20 xl:px-15 xl:py-24' onKeyDown={blockEnter}>
       <Link href="/client/purchase" className='flex items-center mb-4 hover:text-gray-500 duration-200'>
         <IoMdArrowBack /> &nbsp; Back to Purchases
       </Link>
 
-      <div className='flex items-center justify-between mb-8'>
-        <h1 className='text-3xl font-bold'>Create Purchase Order</h1>
-        <div className='flex gap-3'>
-          <button type="button" onClick={() => handleSubmit(true)} disabled={submitting} className='flex items-center gap-2 px-5 py-2.5 border border-gray-300 bg-white rounded-lg hover:bg-gray-50 duration-200 cursor-pointer disabled:opacity-50'>
+      <div className='mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between'>
+        <h1 className='text-2xl font-bold sm:text-3xl'>Create Purchase Order</h1>
+        <div className='grid w-full grid-cols-2 gap-2 md:max-w-[360px]'>
+          <button type="button" onClick={() => handleSubmit(true)} disabled={submitting} className='flex h-11 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-gray-50 px-4 text-sm font-semibold text-gray-600 duration-150 hover:bg-gray-100 cursor-pointer disabled:opacity-50'>
             <FiSave /> Save as Draft
           </button>
-          <button type="button" onClick={() => handleSubmit(false)} disabled={submitting} className='flex items-center gap-2 px-5 py-2.5 bg-[#008C83] text-white rounded-lg hover:bg-[#00675B] duration-200 cursor-pointer disabled:opacity-50'>
+          <button type="button" onClick={() => handleSubmit(false)} disabled={submitting} className='flex h-11 items-center justify-center gap-2 rounded-lg bg-[#008C83] px-4 text-sm font-semibold text-white duration-150 hover:bg-[#00756E] cursor-pointer disabled:opacity-50'>
             <FiCheck /> Create Order
           </button>
         </div>
       </div>
 
-      <div className='flex gap-6 items-start'>
-        <div className='flex-1 flex flex-col gap-6'>
-          <div className='bg-white rounded-xl p-6 shadow-sm'>
+      <div className='flex flex-col gap-6 items-start xl:flex-row'>
+        <div className='w-full xl:w-[320px] flex flex-col gap-6'>
+          <div className='bg-white rounded-xl p-4 sm:p-6 shadow-sm'>
             <h2 className='text-lg font-bold mb-6'>Order Details</h2>
-            <div className='grid grid-cols-2 gap-5'>
+            <div className='grid grid-cols-1 gap-5 sm:grid-cols-2'>
               <div className='flex flex-col gap-1.5'>
                 <label className='text-sm text-gray-500'>Supplier <span className='text-red-500'>*</span></label>
-                <select
-                  value={formData.seller_id}
-                  onChange={(e) => setFormData(prev => ({ ...prev, seller_id: e.target.value }))}
-                  className='px-4 py-2.5 border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-[#008C83] duration-200'
-                >
-                  <option value="">Select supplier</option>
-                  {sellers.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}{s.company_name ? ` - ${s.company_name}` : ''}</option>
-                  ))}
-                </select>
+                <div ref={supplierDropdownRef} className='relative'>
+                  <button
+                    type='button'
+                    onClick={() => setSupplierDropdownOpen((prev) => !prev)}
+                    className='flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-left duration-200 focus:outline-none focus:border-[#008C83]'
+                  >
+                    <span className='truncate'>{selectedSupplierLabel}</span>
+                    <IoChevronDown className='text-sm text-gray-500' />
+                  </button>
+                  {supplierDropdownOpen && (
+                    <div className='absolute left-0 right-0 top-full z-50 mt-1 max-h-52 overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-lg'>
+                      <button
+                        type='button'
+                        onClick={() => {
+                          setFormData((prev) => ({ ...prev, seller_id: '' }))
+                          setSupplierDropdownOpen(false)
+                        }}
+                        className='w-full border-b border-gray-50 px-3 py-2.5 text-left text-sm hover:bg-[#E6FFFD]'
+                      >
+                        Select supplier
+                      </button>
+                      {sellers.map((s) => (
+                        <button
+                          key={s.id}
+                          type='button'
+                          onClick={() => {
+                            setFormData((prev) => ({ ...prev, seller_id: s.id }))
+                            setSupplierDropdownOpen(false)
+                          }}
+                          className='w-full border-b border-gray-50 px-3 py-2.5 text-left text-sm hover:bg-[#E6FFFD] last:border-0'
+                        >
+                          {s.name}{s.company_name ? ` - ${s.company_name}` : ''}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className='flex flex-col gap-1.5'>
                 <label className='text-sm text-gray-500'>Purchase Date <span className='text-red-500'>*</span></label>
@@ -263,21 +316,48 @@ const AddPurchase = () => {
               </div>
               <div className='flex flex-col gap-1.5'>
                 <label className='text-sm text-gray-500'>Location <span className='text-red-500'>*</span></label>
-                <select
-                  value={formData.location_id}
-                  onChange={(e) => setFormData(prev => ({ ...prev, location_id: e.target.value }))}
-                  className='px-4 py-2.5 border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-[#008C83] duration-200'
-                >
-                  <option value="">Select location</option>
-                  {locations.map(l => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
-                  ))}
-                </select>
+                <div ref={locationDropdownRef} className='relative'>
+                  <button
+                    type='button'
+                    onClick={() => setLocationDropdownOpen((prev) => !prev)}
+                    className='flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-left duration-200 focus:outline-none focus:border-[#008C83]'
+                  >
+                    <span className='truncate'>{selectedLocationLabel}</span>
+                    <IoChevronDown className='text-sm text-gray-500' />
+                  </button>
+                  {locationDropdownOpen && (
+                    <div className='absolute left-0 right-0 top-full z-50 mt-1 max-h-52 overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-lg'>
+                      <button
+                        type='button'
+                        onClick={() => {
+                          setFormData((prev) => ({ ...prev, location_id: '' }))
+                          setLocationDropdownOpen(false)
+                        }}
+                        className='w-full border-b border-gray-50 px-3 py-2.5 text-left text-sm hover:bg-[#E6FFFD]'
+                      >
+                        Select location
+                      </button>
+                      {locations.map((l) => (
+                        <button
+                          key={l.id}
+                          type='button'
+                          onClick={() => {
+                            setFormData((prev) => ({ ...prev, location_id: l.id }))
+                            setLocationDropdownOpen(false)
+                          }}
+                          className='w-full border-b border-gray-50 px-3 py-2.5 text-left text-sm hover:bg-[#E6FFFD] last:border-0'
+                        >
+                          {l.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
-          <div className='bg-white rounded-xl p-6 shadow-sm'>
+          <div className='bg-white rounded-xl p-4 sm:p-6 shadow-sm'>
             <div className='flex items-center justify-between mb-6'>
               <h2 className='text-lg font-bold'>Items</h2>
               <button type="button" onClick={addItem} className='flex items-center gap-1.5 text-[#008C83] hover:text-[#00675B] font-medium duration-200 cursor-pointer'>
@@ -288,8 +368,8 @@ const AddPurchase = () => {
             <div className='flex flex-col gap-4'>
               {items.map((item) => (
                 <div key={item._key} className='border border-gray-100 rounded-lg p-4 bg-gray-50/30'>
-                  <div className='grid grid-cols-[2fr_1fr_1fr_1fr_auto_auto] gap-3 items-end'>
-                    <div className='flex flex-col gap-1 relative'>
+                  <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+                    <div className='flex flex-col gap-1 relative sm:col-span-2'>
                       <label className='text-xs text-gray-400'>Product</label>
                       <input
                         type="text"
@@ -372,7 +452,7 @@ const AddPurchase = () => {
                     </div>
                   </div>
 
-                  <div className='mt-3 flex items-center gap-4'>
+                  <div className='mt-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4'>
                     <div className='flex items-center gap-2'>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input
@@ -394,7 +474,7 @@ const AddPurchase = () => {
                       />
                     )}
                     {item.unit && (
-                      <span className='text-xs text-gray-400 ml-auto'>Unit: {item.unit}</span>
+                      <span className='text-xs text-gray-400 sm:ml-auto'>Unit: {item.unit}</span>
                     )}
                   </div>
                 </div>
@@ -402,7 +482,7 @@ const AddPurchase = () => {
             </div>
           </div>
 
-          <div className='bg-white rounded-xl p-6 shadow-sm'>
+          <div className='bg-white rounded-xl p-4 sm:p-6 shadow-sm'>
             <h2 className='text-lg font-bold mb-4'>Notes</h2>
             <textarea
               value={formData.notes}
@@ -414,8 +494,8 @@ const AddPurchase = () => {
           </div>
         </div>
 
-        <div className='w-[300px] flex flex-col gap-6 sticky top-24'>
-          <div className='bg-white rounded-xl p-6 shadow-sm'>
+        <div className='w-full xl:w-[320px] flex flex-col gap-6 xl:sticky xl:top-24'>
+          <div className='bg-white rounded-xl p-4 sm:p-6 shadow-sm'>
             <h2 className='text-lg font-bold mb-5'>Order Summary</h2>
             <div className='flex flex-col gap-3 text-sm'>
               <div className='flex items-center justify-between'>
@@ -482,7 +562,7 @@ const AddPurchase = () => {
             <MdOutlineInventory className='text-[#008C83] text-xl mt-0.5 flex-shrink-0' />
             <div>
               <p className='font-semibold text-sm text-[#006B5A]'>Inventory Update</p>
-              <p className='text-xs text-[#4A8C7A] mt-1'>Once this order is marked as "Received", stock levels for the selected products will be automatically increased in your inventory.</p>
+              <p className='text-xs text-[#4A8C7A] mt-1'>Once this order is marked as &quot;Received&quot;, stock levels for the selected products will be automatically increased in your inventory.</p>
             </div>
           </div>
         </div>
