@@ -93,7 +93,7 @@ export default function BillingPage() {
   return (
     <div className="min-h-screen bg-[#E8F2F1] px-5 pb-6 pt-5 sm:px-6 sm:pt-5 lg:px-8">
       <div className="mb-10 flex h-10 items-center px-2">
-        <h1 className="text-3xl font-bold tracking-tight text-[#0D9B94]">
+        <h1 className="text-2xl font-bold tracking-tight text-[#0D9B94] sm:text-3xl">
           Sahyog <span className="font-semibold text-[#2B3C43]">Home Mart</span>
         </h1>
       </div>
@@ -113,7 +113,7 @@ export default function BillingPage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
               {products.map((product) => (
                 <article
                   key={product.id}
@@ -133,7 +133,7 @@ export default function BillingPage() {
                     </span>
                   </div>
 
-                  <h3 className="min-h-[54px] text-xl font-semibold leading-[1.2] text-[#2B3C43]">{product.name}</h3>
+                  <h3 className="min-h-[40px] text-lg font-semibold leading-[1.2] text-[#2B3C43] sm:min-h-[54px] sm:text-xl">{product.name}</h3>
                   <p className="mt-1 text-[12px] font-medium tracking-wide text-[#87989D]">{product.id}</p>
                   <p className="mt-0.5 text-[13px] text-[#4A5E64]">Stock: {product.stock}</p>
                 </article>
@@ -176,14 +176,14 @@ export default function BillingPage() {
               <div className="space-y-3">
                 {cartItems.map((item) => (
                   <div key={item.name} className="rounded-xl border border-[#E1EAE9] bg-[#FCFEFE] px-3 py-2.5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                      <div className="min-w-0">
                         <p className="text-xl font-medium text-[#2F3F45]">{item.name}</p>
                         <p className="mt-1 text-sm text-[#788A8F]">
                           Rs {item.price} x {item.quantity}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 sm:ml-auto">
                         <button className="flex h-6 w-6 items-center justify-center rounded-md border border-[#E4EBEA] bg-white text-[#95A6AA]">
                           <HiMinusSmall />
                         </button>
@@ -191,7 +191,7 @@ export default function BillingPage() {
                           <HiPlusSmall />
                         </button>
                       </div>
-                      <p className="min-w-14 text-right text-2xl font-semibold text-[#2D3B42]">Rs {item.price}</p>
+                      <p className="min-w-14 text-left text-xl font-semibold text-[#2D3B42] sm:text-right sm:text-2xl">Rs {item.price}</p>
                     </div>
                   </div>
                 ))}
@@ -207,14 +207,14 @@ export default function BillingPage() {
                 <span>Tax (18%)</span>
                 <span>Rs {tax.toFixed(2)}</span>
               </div>
-              <div className="mt-1 flex items-center justify-between">
-                <span className="text-[36px] font-semibold text-[#2D3B42]">Total</span>
-                <span className="text-[42px] font-bold text-[#0D9B94]">Rs {total.toFixed(2)}</span>
+              <div className="mt-1 flex items-end justify-between gap-4">
+                <span className="text-2xl font-semibold text-[#2D3B42] sm:text-[36px]">Total</span>
+                <span className="text-2xl font-bold text-[#0D9B94] sm:text-[42px]">Rs {total.toFixed(2)}</span>
               </div>
 
-              <div className="grid grid-cols-3 justify-items-center gap-2.5 pt-3">
+              <div className="grid grid-cols-1 justify-items-center gap-2.5 pt-3 sm:grid-cols-3">
                 <button
-                  className={`flex h-[57.5875px] w-[117.325px] flex-col items-center justify-center gap-1 rounded-[8px] pb-0 text-[13px] ${
+                  className={`flex h-[57.5875px] w-full min-w-0 flex-col items-center justify-center gap-1 rounded-[8px] pb-0 text-[13px] ${
                     paymentMode === 'cash'
                       ? 'border-[0.8px] border-[#B6E6D6] bg-[#E6F5EE] font-semibold text-[#269661]'
                       : 'border-[0.8px] border-[#E0E9E8] bg-[#F7FAFA] font-medium text-[#82969A]'
@@ -225,7 +225,7 @@ export default function BillingPage() {
                   Cash
                 </button>
                 <button
-                  className={`flex h-[57.5875px] w-[117.325px] flex-col items-center justify-center gap-1 rounded-[8px] pb-0 text-[13px] ${
+                  className={`flex h-[57.5875px] w-full min-w-0 flex-col items-center justify-center gap-1 rounded-[8px] pb-0 text-[13px] ${
                     paymentMode === 'upi'
                       ? 'border-[0.8px] border-[#B6D6E6] bg-[#EAF4FC] font-semibold text-[#2A6F9A]'
                       : 'border-[0.8px] border-[#E0E9E8] bg-[#F7FAFA] font-medium text-[#82969A]'
@@ -236,7 +236,7 @@ export default function BillingPage() {
                   UPI
                 </button>
                 <button
-                  className={`flex h-[57.5875px] w-[117.325px] flex-col items-center justify-center gap-1 rounded-[8px] pb-0 text-[13px] ${
+                  className={`flex h-[57.5875px] w-full min-w-0 flex-col items-center justify-center gap-1 rounded-[8px] pb-0 text-[13px] ${
                     paymentMode === 'credit'
                       ? 'border-[0.8px] border-[#E3C3B5] bg-[#FFF3EC] font-semibold text-[#B15C35]'
                       : 'border-[0.8px] border-[#E0E9E8] bg-[#F7FAFA] font-medium text-[#82969A]'
@@ -248,7 +248,7 @@ export default function BillingPage() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5 pt-3">
+              <div className="grid grid-cols-1 gap-2.5 pt-3 sm:grid-cols-2">
                 <button className="flex h-12 items-center justify-center gap-2 rounded-xl border border-[#DFE8E7] bg-[#F4F7F7] text-base font-semibold text-[#6E8186]">
                   <BiPrinter className="h-5 w-5" />
                   Print
@@ -265,7 +265,7 @@ export default function BillingPage() {
 
       {isCustomerModalOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#00000066] px-4">
-          <div className="w-full max-w-[760px] rounded-3xl border border-[#DCE5E4] bg-white px-7 py-6 shadow-[0_30px_80px_-28px_rgba(15,34,40,0.6)]">
+          <div className="w-full max-w-[760px] rounded-3xl border border-[#DCE5E4] bg-white px-4 py-6 sm:px-7 shadow-[0_30px_80px_-28px_rgba(15,34,40,0.6)]">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-[20px] leading-7 font-bold text-[#1F2B38]" style={nunitoSans}>
                 Add New Customer
@@ -311,7 +311,7 @@ export default function BillingPage() {
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-6 flex flex-col-reverse justify-end gap-3 sm:flex-row">
               <button
                 className="h-10 rounded-xl border border-[#DDE5E6] bg-[#F5F8F8] px-6 text-[14px] font-semibold text-[#5D6E75] transition-all duration-200 hover:bg-[#EDF3F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9BB5B2]/40"
                 onClick={closeCustomerModal}
@@ -319,7 +319,7 @@ export default function BillingPage() {
                 Cancel
               </button>
               <button
-                className={`h-10 w-[131.475px] rounded-xl text-[14px] font-semibold transition-all duration-200 ${
+                className={`h-10 w-full rounded-xl text-[14px] font-semibold transition-all duration-200 sm:w-[131.475px] ${
                   canSaveCustomer
                     ? 'bg-[#099D95] text-white shadow-[0_12px_24px_-14px_rgba(9,157,149,0.9)] hover:bg-[#068C85] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#099D95]/40'
                     : 'cursor-not-allowed bg-[#B8DAD7] text-white/80'
