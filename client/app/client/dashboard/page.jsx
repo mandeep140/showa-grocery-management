@@ -95,8 +95,8 @@ const recentActivity = [
 
 const Dashboard = () => {
   return (
-    <div className='w-full min-h-screen px-15 py-30 bg-[#E6FFFD]'>
-      <h2 className='font-semibold text-4xl'>Dashboard</h2>
+    <div className='w-full min-h-screen bg-[#E6FFFD] px-4 py-20 sm:px-6 lg:px-10'>
+      <h2 className='text-3xl font-semibold sm:text-4xl'>Dashboard</h2>
       {/* quick stat cards */}
       <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 my-10'>
         {cards.map((card) => (
@@ -118,15 +118,15 @@ const Dashboard = () => {
       </div>
 
       {/* quick info table */}
-      <div className='flex items-center justify-between w-full gap-7 mb-10'>
+      <div className='mb-10 flex w-full flex-col items-stretch gap-6 xl:flex-row xl:gap-7'>
         {/* low stock items */}
-        <div className='rounded-xl border-2 border-[#FFE0B2] bg-[#F4FAFF] w-1/3 '>
+        <div className='w-full rounded-xl border-2 border-[#FFE0B2] bg-[#F4FAFF] xl:w-1/3'>
           <div className='w-full rounded-t-xl border-2 border-[#FFE0B2] flex items-center justify-around h-14  px-7 bg-[#FFE0B2]'>
             <p className='text-lg font-bold text-[#FFB74D]'><IoWarningOutline /></p>
             <p className='text-sm text-gray-500 ml-4'>Low Stock Items</p>
             <p className='text-sm text-white w-7 h-7 flex items-center ml-auto justify-center p-2 rounded-full bg-[#FFB74D] font-bold'>{lowStockItems.length}</p>
           </div>
-          <div className='grid px-4 py-6 h-75 overflow-y-auto gap-2'>
+          <div className='grid max-h-72 gap-2 overflow-y-auto px-4 py-6'>
             {lowStockItems.map((item) => (
               <div key={item.id} className='flex flex-col items-center justify-between py-2 bg-[#FFFBF5] border-2 border-[#FFE0B2] rounded-lg px-4'>
                 <div className='flex justify-between w-full items-center'>
@@ -143,13 +143,13 @@ const Dashboard = () => {
         </div>
 
         {/* expiring items */}
-        <div className='rounded-xl border-2 border-[#FFCDD2] bg-[#FFF5F5] w-1/3 '>
+        <div className='w-full rounded-xl border-2 border-[#FFCDD2] bg-[#FFF5F5] xl:w-1/3'>
           <div className='w-full rounded-t-xl border-2 border-[#FFCDD2] flex items-center justify-around h-14 px-7 bg-[#FFCDD2]'>
             <p className='text-lg font-bold text-[#EF5350]'><FaRegClock /></p>
             <p className='text-sm text-gray-500 ml-4'>Expiring Soon</p>
             <p className='text-sm text-white w-7 h-7 flex items-center ml-auto justify-center p-2 rounded-full bg-[#EF5350] font-bold'>{expiringItems.length}</p>
           </div>
-          <div className='grid px-4 py-6 h-75 overflow-y-auto gap-2'>
+          <div className='grid max-h-72 gap-2 overflow-y-auto px-4 py-6'>
             {expiringItems.map((item) => (
               <div key={item.id} className='flex flex-col items-center justify-between py-2 bg-[#FFF5F5] border-2 border-[#FFCDD2] rounded-lg px-4'>
                 <div className='flex justify-between w-full items-center'>
@@ -166,13 +166,13 @@ const Dashboard = () => {
         </div>
 
         {/* out of stock items */}
-        <div className='rounded-xl border-2 border-[#FFCDD2] bg-[#FFF5F5] w-1/3 '>
+        <div className='w-full rounded-xl border-2 border-[#FFCDD2] bg-[#FFF5F5] xl:w-1/3'>
           <div className='w-full rounded-t-xl border-2 border-[#FFCDD2] flex items-center justify-around h-14 px-7 bg-[#FFCDD2]'>
             <p className='text-lg font-bold text-[#EF5350]'><FaBox /></p>
             <p className='text-sm text-gray-500 ml-4'>Out of Stock</p>
             <p className='text-sm text-white w-7 h-7 flex items-center ml-auto justify-center p-2 rounded-full bg-[#EF5350] font-bold'>{outOfStockItems.length}</p>
           </div>
-          <div className='grid px-4 py-6 h-75 overflow-y-auto gap-2'>
+          <div className='grid max-h-72 gap-2 overflow-y-auto px-4 py-6'>
             {outOfStockItems.map((item) => (
               <div key={item.id} className='flex flex-col items-center justify-between py-2 bg-[#FFF5F5] border-2 border-[#FFCDD2] rounded-lg px-4'>
                 <div className='flex justify-between w-full items-center'>
@@ -190,14 +190,14 @@ const Dashboard = () => {
       </div>
 
       {/* today sales and quick actions */}
-      <div className='flex items-stretch justify-between w-full gap-7'>
+      <div className='flex w-full flex-col items-stretch gap-6 xl:flex-row xl:gap-7'>
         {/* today sales */}
-        <div className='w-7/10 border rounded-xl border-[#C8E6C9] bg-white'>
+        <div className='w-full rounded-xl border border-[#C8E6C9] bg-white xl:w-7/10'>
           <div className='w-full rounded-t-xl flex items-center justify-start h-14 px-6 bg-[#E8F5E9] gap-4'>
             <p className='text-lg font-bold text-[#4CAF50]'><FaRupeeSign /></p>
-            <p className='text-lg font-bold'>Today's Sales Overview</p>
+            <p className='text-lg font-bold'>Today&apos;s Sales Overview</p>
           </div>
-          <div className='flex items-center justify-start gap-70 w-full h-25 bg-[#F9F9F9] px-10'>
+          <div className='flex w-full flex-col gap-4 bg-[#F9F9F9] px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-10 sm:px-10'>
             <span>
               <p className='font-light text-sm'>Total Bills</p>
               <p className='font-bold text-2xl'>{totalSales.length}</p>
@@ -209,9 +209,9 @@ const Dashboard = () => {
           </div>
           <div className='mt-2 px-3'>
             <p className='my-4'>Recent Sales</p>
-            <div className='grid h-75 overflow-y-auto w-full gap-6'>
+            <div className='grid max-h-72 w-full gap-4 overflow-y-auto sm:gap-6'>
               {totalSales.map((sale) => (
-                <div key={sale.id} className='flex items-center rounded-lg px-4 gap-3'>
+                <div key={sale.id} className='flex items-center gap-3 rounded-lg px-2 sm:px-4'>
                   <div className='p-3 text-xl rounded-lg bg-[#E8F5E9] text-[#4CAF50]'><FaFileAlt /></div>
                   <div className='w-full items-center'>
                     <p className='text-sm font-medium text-green-600'>{sale.id}</p>
@@ -227,12 +227,12 @@ const Dashboard = () => {
         </div>
 
         {/* quick actions */}
-        <div className='w-3/10 border rounded-xl border-[#BBDEFB] bg-white'>
+        <div className='w-full rounded-xl border border-[#BBDEFB] bg-white xl:w-3/10'>
           <div className='w-full rounded-t-xl flex items-center justify-start h-14 px-6 bg-[#F5F5F5] gap-4'>
             <p className='text-lg font-bold text-green-600'><FaBox /></p>
             <p className='text-md font-semibold'>Quick Actions</p>
           </div>
-          <div className='grid h-90 overflow-y-auto w-full gap-6 p-4'>
+          <div className='grid max-h-80 w-full gap-4 overflow-y-auto p-4 sm:gap-6'>
             {quickActions.map((action) => (
               <div key={action.name} className='flex items-center rounded-lg px-4 gap-3 cursor-pointer' style={{ backgroundColor: `${action.color}20` }}>
                 <div className='p-2 text-xl rounded-lg' style={{ backgroundColor: action.color, color: 'white' }}>{action.icon}</div>
@@ -246,14 +246,14 @@ const Dashboard = () => {
       </div>
 
       {/* snapshot and activity */}
-      <div className='flex items-stretch justify-between w-full gap-7 my-10'>
+      <div className='my-10 flex w-full flex-col items-stretch gap-6 2xl:flex-row 2xl:gap-7'>
         {/* snapshot */}
-        <div className='w-1/2 border rounded-xl border-[#C8E6C9] bg-white'>
+        <div className='w-full rounded-xl border border-[#C8E6C9] bg-white 2xl:w-1/2'>
           <div className='w-full rounded-t-xl flex items-center justify-start h-14 px-6 bg-[#E8F5E9] gap-4'>
             <p className='text-lg font-bold text-[#4CAF50]'><FaBox /></p>
             <p className='text-lg font-bold'>Inventory Snapshot</p>
           </div>
-          <div className='grid h-150 overflow-y-auto w-full gap-6 p-4'>
+          <div className='grid max-h-[40rem] w-full gap-6 overflow-y-auto p-4'>
             <p>Recently Added Products</p>
             {recentlyAddedProducts.map((product) => (
               <div key={product.id} className='flex items-center rounded-lg px-4 gap-3'>
@@ -261,7 +261,7 @@ const Dashboard = () => {
                   <p className='text-sm font-semibold'>{product.name}</p>
                   <p className='text-xs text-gray-500'>{product.id} • {product.category}</p>
                 </div>
-                <div className='w-20 mt-2 ml-auto'>
+                <div className='ml-auto mt-2 shrink-0 text-right sm:w-20'>
                   <p className='text-green-500 text-sm'>{product.addedBy}</p>
                   <p className='text-xs text-gray-500'>{new Date(product.timeAdded).toLocaleTimeString()}</p>
                 </div>
@@ -277,7 +277,7 @@ const Dashboard = () => {
                   <p className='text-sm font-semibold'>{product.name}</p>
                   <p className='text-xs text-gray-500'>{product.id} • {product.update}</p>
                 </div>
-                <div className='w-20 mt-2 ml-auto'>
+                <div className='ml-auto mt-2 shrink-0 text-right sm:w-20'>
                   <p className='text-green-500 text-sm'>{product.updatedBy}</p>
                   <p className='text-xs text-gray-500'>{new Date(product.timeUpdated).toLocaleTimeString()}</p>
                 </div>
@@ -287,14 +287,14 @@ const Dashboard = () => {
         </div>
 
         {/* recent activity */}
-        <div className='w-1/2 border rounded-xl border-[#BBDEFB] bg-white'>
+        <div className='w-full rounded-xl border border-[#BBDEFB] bg-white 2xl:w-1/2'>
           <div className='w-full rounded-t-xl flex items-center justify-start h-14 px-6 bg-[#F5F5F5] gap-4'>
             <p className='text-lg font-bold text-[#2196F3]'><FaBox /></p>
             <p className='text-lg font-bold'>Recent Activity</p>
           </div>
-          <div className='grid min-h-90 overflow-y-auto w-full gap-6 p-4'>
+          <div className='grid max-h-[40rem] w-full gap-6 overflow-y-auto p-4'>
             {recentActivity.map((activity, index) => (
-              <div key={index} className='flex items-center rounded-lg px-4 gap-3'>
+              <div key={index} className='flex items-center gap-3 rounded-lg px-2 sm:px-4'>
                 <span>{
                   activity.category === 'inventory' ? <FaBox /> :
                     activity.category === 'sales' ? <FaRupeeSign /> :
@@ -305,7 +305,7 @@ const Dashboard = () => {
                   <p className='text-sm font-semibold'>{activity.activity}</p>
                   <p className='text-xs text-gray-500'>{activity.by} • {activity.category}</p>
                 </div>
-                <div className='w-20 mt-2 ml-auto'>
+                <div className='ml-auto mt-2 shrink-0 text-right sm:w-20'>
                   <p className='text-gray-500 text-xs'>{new Date(activity.time).toLocaleTimeString()}</p>
                 </div>
               </div>
