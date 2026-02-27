@@ -86,10 +86,6 @@ export function ReportTable({ content, pillStyles }) {
             <LuFileOutput className='h-3.5 w-3.5' />
             Export CSV
           </button>
-          <button className='inline-flex h-[37px] w-[86.65px] items-center justify-center gap-1 rounded-[10px] bg-[#2196F3] text-xs font-semibold text-white'>
-            <FiPrinter className='h-3.5 w-3.5' />
-            Print
-          </button>
         </div>
       </div>
 
@@ -167,7 +163,7 @@ function DataRow({ type, row, pillStyles }) {
         <p className='font-medium'>{row.date}</p>
         <p className='text-xs text-[#9aa3a8]'>{row.time}</p>
       </td>
-      <td className='px-4 py-3.5 font-semibold'>{row.items}</td>
+      <td className='px-4 py-3.5 text-[#5f6a70]'>{row.items}</td>
       <td className='px-4 py-3.5'><StatusPill text={row.payment} pillStyles={pillStyles} /></td>
       <td className='px-4 py-3.5 text-right font-semibold'>{row.amount}</td>
     </tr>

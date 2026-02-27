@@ -1,0 +1,14 @@
+{
+    "store": {
+        "name": "Sahyog Home Mart",
+        "id": "showa-store-001",
+        "address": "Patna, Bihar",
+        "contact": "9876543210",
+        "lastLogin": "2026-02-26T16:37:28.588Z"
+    },
+    "server": {
+        "url": "https://services.showa.online/api/store/verify",
+        "lastVerified": "2026-02-26T16:37:28.584Z",
+        "status": "active"
+    }
+}

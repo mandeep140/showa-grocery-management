@@ -2,6 +2,8 @@ import { Nunito_Sans } from "next/font/google";
 import "./globals.css";
 import SideNav from "@/component/SideNav";
 import NextTopLoader from "nextjs-toploader";
+import GlobalShortcuts from "@/component/GlobalShortcuts";
+import Providers from "@/component/Providers";
 
 const nunitoSans = Nunito_Sans({
   variable: "--font-nunito-sans",
@@ -25,7 +27,10 @@ export default function RootLayout({ children }) {
         style={{ fontFamily: "var(--font-nunito-sans)" }}
       >
         <NextTopLoader color="#FFA503" showSpinner={false} />
-        <SideNav>{children}</SideNav>
+        <GlobalShortcuts />
+        <Providers>
+          <SideNav>{children}</SideNav>
+        </Providers>
       </body>
     </html>
   );
