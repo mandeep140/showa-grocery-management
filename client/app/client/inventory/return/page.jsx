@@ -11,13 +11,13 @@ import { FaFileAlt } from "react-icons/fa";
 const Return = () => {
     const [returnType, setReturnType] = useState(true); 
   return (
-    <div className='w-full min-h-screen px-15 py-20 bg-[#E6FFFD]'>
+    <div className='w-full min-h-screen bg-[#E6FFFD] px-4 py-20 sm:px-6 lg:px-10'>
             <Link href="/client/inventory" className='flex items-center mb-8 hover:text-gray-500 duration-200'> <IoMdArrowBack /> &nbsp; Back to inventory</Link>
             <h1 className='text-3xl font-bold mb-2'>Returns management</h1>
             <p className='text-sm text-gray-400 mb-10'>Process customer and supplier returns with inventory impact</p>
-            <div className='w-[80%] mx-auto flex gap-6 items-center mb-10'>
+            <div className='mx-auto mb-10 flex w-full max-w-5xl flex-col items-center gap-4 md:flex-row md:gap-6'>
                 <div 
-                    className={`flex items-center justify-center w-1/2 border-2 ${returnType ? 'border-green-500 bg-white' : 'border-gray-300 bg-white'} rounded-lg py-4 gap-4 cursor-pointer hover:border-green-400 duration-150`} 
+                    className={`flex w-full cursor-pointer items-center justify-center gap-4 rounded-lg border-2 py-4 duration-150 md:w-1/2 ${returnType ? 'border-green-500 bg-white' : 'border-gray-300 bg-white'} hover:border-green-400`} 
                     onClick={() => setReturnType(true)}
                 >
                     <VscDebugRestart className={`text-4xl ${returnType ? 'text-green-500' : 'text-gray-400'}`} />
@@ -27,7 +27,7 @@ const Return = () => {
                     </div>
                 </div>
                 <div 
-                    className={`flex items-center justify-center w-1/2 border-2 ${!returnType ? 'border-green-500 bg-white' : 'border-gray-300 bg-white'} rounded-lg py-4 gap-4 cursor-pointer hover:border-green-400 duration-150`} 
+                    className={`flex w-full cursor-pointer items-center justify-center gap-4 rounded-lg border-2 py-4 duration-150 md:w-1/2 ${!returnType ? 'border-green-500 bg-white' : 'border-gray-300 bg-white'} hover:border-green-400`} 
                     onClick={() => setReturnType(false)}
                 >
                     <FaBox className={`text-4xl ${!returnType ? 'text-green-500' : 'text-gray-400'}`} />
@@ -38,7 +38,7 @@ const Return = () => {
                 </div>
             </div>
 
-            {returnType ? (<div className='w-[80%] mx-auto rounded-lg bg-white flex flex-col gap-6 px-7 py-5'>
+            {returnType ? (<div className='mx-auto flex w-full max-w-5xl flex-col gap-6 rounded-lg bg-white px-5 py-5 sm:px-7'>
                 <h2 className='font-semibold flex items-center gap-2'><FaFileAlt className='text-green-500 font-semibold text-xl'/>Customer Return Details</h2>
                 <span>
                     <label htmlFor="billNo">Original Bill*</label>
@@ -57,12 +57,12 @@ const Return = () => {
                     <input type="text" name="reason" id="reason" required className='w-full px-4 py-2 mt-2 rounded-lg border border-gray-200' />
                 </span>
                 <hr />
-                <div className='flex w-full items-center justify-between px-2'>
+                <div className='flex w-full flex-col-reverse items-stretch justify-between gap-3 px-2 sm:flex-row sm:items-center'>
                     <Link href="/client/inventory" className='px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 duration-150'>cancel</Link>
                     <button type='submit' className='px-6 py-2 bg-[#008C83] text-white rounded-lg hover:bg-[#007571] duration-200'>Process return</button>
                 </div>
             </div>) : (
-                <div className='w-[80%] mx-auto rounded-lg bg-white flex flex-col gap-6 px-7 py-5'>
+                <div className='mx-auto flex w-full max-w-5xl flex-col gap-6 rounded-lg bg-white px-5 py-5 sm:px-7'>
                     <h2 className='font-semibold flex items-center gap-2'><FaFileAlt className='text-green-500 font-semibold text-xl'/>Supplier Return Details</h2>
                     <span>
                         <label htmlFor="supplier">Supplier*</label>
@@ -81,7 +81,7 @@ const Return = () => {
                         <input type="text" name="reason" id="reason" required className='w-full px-4 py-2 mt-2 rounded-lg border border-gray-200' />
                     </span>
                     <hr />
-                    <div className='flex w-full items-center justify-between px-2'>
+                    <div className='flex w-full flex-col-reverse items-stretch justify-between gap-3 px-2 sm:flex-row sm:items-center'>
                         <Link href="/client/inventory" className='px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 duration-150'>cancel</Link>
                         <button type='submit' className='px-6 py-2 bg-[#008C83] text-white rounded-lg hover:bg-[#007571] duration-200'>Process return</button>
                     </div>
