@@ -1,5 +1,6 @@
 'use client'
 import React, { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import { IoMdArrowBack } from "react-icons/io"
 import { HiOutlineQrCode } from 'react-icons/hi2'
 import Link from 'next/link'
@@ -118,8 +119,8 @@ const Add = () => {
                     <div className='flex flex-col gap-4'>
                         <p className='text-lg font-bold'>Product image</p>
                         <div className='flex flex-wrap items-center gap-4'>
-                            <div className='w-28 h-28 sm:w-32 sm:h-32 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-sm overflow-hidden flex-shrink-0'>
-                                {imagePreview ? <img src={imagePreview} alt="Preview" className='w-full h-full object-cover' /> : 'Preview'}
+                            <div className='w-28 h-28 sm:w-32 sm:h-32 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-sm overflow-hidden shrink-0'>
+                                {imagePreview ? <Image src={imagePreview} alt="Preview" width={128} height={128} unoptimized className='w-full h-full object-cover' /> : 'Preview'}
                             </div>
                             <div className='flex flex-col gap-2'>
                                 <button type='button' onClick={() => fileRef.current?.click()} className='px-4 py-2 rounded-lg text-[#008C83] border border-[#008C83] hover:bg-[#E6FFFD] duration-200 cursor-pointer'>
