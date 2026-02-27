@@ -1,153 +1,227 @@
 'use client'
 import React, { useState, useEffect, useRef } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { IoMdArrowBack } from "react-icons/io";
-import JsBarcode from 'jsbarcode';
-import { FaBox } from 'react-icons/fa';
-
-const product = {
-    name: "Tata salt 1KG",
-    category: "Spices",
-    brand: "Tata",
-    unit: "pcs",
-    sellingPrice: 22.50,
-    minimumStock: 20,
-    bulkQuantity: 20,
-    bulkPrice: 17.59,
-    expireDate: "2024-12-31",
-    productCode: "TS1KG",
-}
-
+import { IoMdArrowBack } from "react-icons/io"
+import JsBarcode from 'jsbarcode'
+import { FaBox } from 'react-icons/fa'
+import { GoPencil } from "react-icons/go"
+import { FiTrash2 } from "react-icons/fi"
+import api, { getCurrentServerURL } from '@/util/api'
 
 const View = () => {
-    const params = useParams();
-    const { id } = params;
-    const barcodeRef = useRef(null);
+    const params = useParams()
+    const router = useRouter()
+    const { id } = params
+    const barcodeRef = useRef(null)
+    const [product, setProduct] = useState(null)
+    const [loading, setLoading] = useState(true)
+    const [deleting, setDeleting] = useState(false)
 
     useEffect(() => {
-        if (barcodeRef.current) {
-            JsBarcode(barcodeRef.current, product.productCode, {
-                format: "CODE128",
-                width: 2,
-                height: 70,
-                displayValue: false,
-                fontSize: 16,
-                margin: 10
-            });
+        fetchProduct()
+    }, [id])
+
+    const fetchProduct = async () => {
+        try {
+            const res = await api.get(`/api/products/${id}`)
+            if (res.data.success) setProduct(res.data.product)
+        } catch (err) {
+            alert('Product not found')
+            router.push('/client/inventory')
+        } finally {
+            setLoading(false)
         }
-    }, []);
+    }
+
+    useEffect(() => {
+        if (product && barcodeRef.current && (product.barcode || product.product_code)) {
+            try {
+                JsBarcode(barcodeRef.current, product.barcode || product.product_code, {
+                    format: "CODE128",
+                    width: 2,
+                    height: 70,
+                    displayValue: false,
+                    fontSize: 16,
+                    margin: 10
+                })
+            } catch (e) {}
+        }
+    }, [product])
+
+    const handleDelete = async () => {
+        if (!confirm('Are you sure you want to deactivate this product?')) return
+        setDeleting(true)
+        try {
+            const res = await api.delete(`/api/products/${id}`)
+            if (res.data.success) {
+                alert('Product deactivated')
+                router.push('/client/inventory')
+            } else {
+                alert(res.data.message)
+            }
+        } catch (err) {
+            alert(err.response?.data?.message || 'Failed to delete product')
+        } finally {
+            setDeleting(false)
+        }
+    }
+
+    if (loading) return <div className='w-full min-h-screen px-15 py-20 bg-[#E6FFFD] flex items-center justify-center'><p className='text-gray-500'>Loading...</p></div>
+    if (!product) return null
+
+    const serverURL = getCurrentServerURL()
+    const imageUrl = product.img_path ? `${serverURL}/api/products/image/${product.img_path}` : null
 
     return (
-        <div className='w-full min-h-screen bg-[#E6FFFD] px-4 py-20 sm:px-6 lg:px-10'>
+        <div className='w-full min-h-screen px-15 py-20 bg-[#E6FFFD]'>
             <Link href="/client/inventory" className='flex items-center mb-8 hover:text-gray-500 duration-200'> <IoMdArrowBack /> &nbsp; Back to inventory</Link>
-            <h1 className='text-3xl font-bold mb-10'>Product Details - {id}</h1>
-            <div className='mx-auto flex w-full max-w-5xl flex-col gap-6 rounded-xl bg-white p-6'>
+            <div className='flex items-center justify-between mb-10'>
+                <h1 className='text-3xl font-bold'>Product Details</h1>
+                <div className='flex gap-3'>
+                    <Link href={`/client/inventory/${id}/edit`} className='flex items-center gap-2 px-5 py-2.5 border border-gray-300 bg-white rounded-lg hover:bg-gray-50 duration-200'>
+                        <GoPencil /> Edit
+                    </Link>
+                    <button onClick={handleDelete} disabled={deleting} className='flex items-center gap-2 px-5 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 duration-200 cursor-pointer disabled:opacity-50'>
+                        <FiTrash2 /> {deleting ? 'Deleting...' : 'Delete'}
+                    </button>
+                </div>
+            </div>
+
+            <div className='w-[75%] mx-auto rounded-xl bg-white p-6 flex flex-col gap-6'>
+                {imageUrl && (
+                    <div className='flex items-center gap-6 mb-2'>
+                        <img src={imageUrl} alt={product.name} className='w-32 h-32 object-cover rounded-lg' />
+                    </div>
+                )}
                 <h2 className='font-bold text-xl mb-2'>Basic Information</h2>
-                <div className='flex w-full flex-col gap-4 sm:flex-row'>
-                    <span className='w-full sm:w-1/2'>
+                <div className='w-full flex'>
+                    <span className='w-[50%]'>
                         <p className='text-gray-400 text-sm'>Product name</p>
                         <p className='font-semibold text-md'>{product.name}</p>
                     </span>
-                    <span className='w-full sm:w-1/2'>
+                    <span className='w-[50%]'>
                         <p className='text-gray-400 text-sm'>Product code</p>
-                        <p className='text-md'>{product.productCode}</p>
+                        <p className='text-md'>{product.product_code}</p>
                     </span>
                 </div>
-                <div className='flex w-full flex-col gap-4 sm:flex-row'>
-                    <span className='w-full sm:w-1/2'>
+                <div className='w-full flex'>
+                    <span className='w-[50%]'>
                         <p className='text-gray-400 text-sm'>Category</p>
-                        <p className=' text-md'>{product.category}</p>
+                        <p className='text-md'>{product.category_name || '—'}</p>
                     </span>
-                    <span className='w-full sm:w-1/2'>
+                    <span className='w-[50%]'>
                         <p className='text-gray-400 text-sm'>Brand</p>
-                        <p className=' text-md'>{product.brand}</p>
+                        <p className='text-md'>{product.brand_name || '—'}</p>
                     </span>
                 </div>
-                <div className='flex w-full flex-col gap-4 sm:flex-row'>
-                    <span className='w-full sm:w-1/2'>
+                <div className='w-full flex'>
+                    <span className='w-[50%]'>
                         <p className='text-gray-400 text-sm'>Unit</p>
                         <p className='text-md'>{product.unit}</p>
                     </span>
-                    <span className='w-full sm:w-1/2'>
+                    <span className='w-[50%]'>
                         <p className='text-gray-400 text-sm'>Selling price</p>
-                        <p className='font-semibold text-md text-green-400'>₹ {product.sellingPrice}</p>
+                        <p className='font-semibold text-md text-green-400'>₹ {product.default_selling_price}</p>
                     </span>
                 </div>
-                <div className='flex w-full flex-col gap-4 sm:flex-row'>
-                    <span className='w-full sm:w-1/2'>
+                <div className='w-full flex'>
+                    <span className='w-[50%]'>
+                        <p className='text-gray-400 text-sm'>Buying price</p>
+                        <p className='text-md'>₹ {product.default_buying_rate}</p>
+                    </span>
+                    <span className='w-[50%]'>
+                        <p className='text-gray-400 text-sm'>Tax</p>
+                        <p className='text-md'>{product.tax_percent}%</p>
+                    </span>
+                </div>
+                <div className='w-full flex'>
+                    <span className='w-[50%]'>
                         <p className='text-gray-400 text-sm'>Bulk quantity</p>
-                        <p className=' text-md'>{product.bulkQuantity}</p>
+                        <p className='text-md'>{product.bulk_quantity || '—'}</p>
                     </span>
-                    <span className='w-full sm:w-1/2'>
+                    <span className='w-[50%]'>
                         <p className='text-gray-400 text-sm'>Bulk price</p>
-                        <p className='font-semibold text-md text-green-400'>₹ {product.bulkPrice}</p>
+                        <p className='font-semibold text-md text-green-400'>{product.bulk_price ? `₹ ${product.bulk_price}` : '—'}</p>
                     </span>
                 </div>
-                <div className='flex w-full flex-col gap-4 sm:flex-row'>
-                    <span className='w-full sm:w-1/2'>
+                <div className='w-full flex'>
+                    <span className='w-[50%]'>
                         <p className='text-gray-400 text-sm'>Minimum stock level</p>
-                        <p className=' text-md'>{product.minimumStock}</p>
+                        <p className='text-md'>{product.minimum_stock_level}</p>
                     </span>
-                    <span className='w-full sm:w-1/2'>
-                        <p className='text-gray-400 text-sm'>Expire date</p>
-                        <p className=' text-md'>{product.expireDate}</p>
+                    <span className='w-[50%]'>
+                        <p className='text-gray-400 text-sm'>Barcode</p>
+                        <p className='text-md'>{product.barcode || '—'}</p>
                     </span>
                 </div>
+                {product.description && (
+                    <div className='w-full'>
+                        <p className='text-gray-400 text-sm'>Description</p>
+                        <p className='text-md'>{product.description}</p>
+                    </div>
+                )}
 
                 <hr />
                 <div>
                     <h2 className='font-bold text-xl mb-4'>Barcode</h2>
-                    <span className='flex w-full items-center justify-start gap-3 rounded-lg bg-gray-50 p-4 sm:p-8'>
+                    <span className='w-full flex justify-start items-center bg-gray-50 p-8 rounded-lg'>
                         <svg ref={barcodeRef}></svg>
-                        <p className='text-lg font-bold sm:text-xl'>{product.productCode}</p>
+                        <p className='ml-4 font-bold text-xl'>{product.barcode || product.product_code}</p>
                     </span>
                 </div>
             </div>
-            <div className='mx-auto mt-10 flex w-full max-w-5xl flex-col gap-6 rounded-xl bg-white p-6'>
-                <h2 className='font-bold text-xl mb-4'>Stock summary</h2>
-                <div className='flex w-full flex-col gap-4 lg:flex-row'>
-                    <div className='flex w-full flex-col items-start gap-2 rounded-lg bg-[#E8F5E9] p-6 text-[#2E7D32] lg:w-1/3'>
-                        <span className='flex items-center text-md gap-2 font-light'><FaBox /> Shop stock</span>
-                        <p className='font-bold text-xl'>125</p>
-                        <p className='font-light text-sm'>Available on shop floor</p>
-                    </div>
-                    <div className='flex w-full flex-col items-start gap-2 rounded-lg bg-[#E3F2FD] p-6 text-[#1976D2] lg:w-1/3'>
-                        <span className='flex items-center text-md gap-2 font-light'><FaBox /> Storage stock</span>
-                        <p className='font-bold text-xl'>325</p>
-                        <p className='font-light text-sm'>In storage/godown</p>
-                    </div>
-                    <div className='flex w-full flex-col items-start gap-2 rounded-lg bg-[#E0F2F1] p-6 text-[#00796B] lg:w-1/3'>
+
+            <div className='w-[75%] mx-auto mt-10 rounded-xl bg-white p-6 flex flex-col gap-6'>
+                <h2 className='font-bold text-xl mb-4'>Stock Summary</h2>
+                <div className='w-full flex gap-4'>
+                    {product.stock_by_location && product.stock_by_location.length > 0 ? (
+                        product.stock_by_location.map((loc, i) => (
+                            <div key={loc.location_id} className={`flex-1 flex flex-col items-start gap-2 ${i % 3 === 0 ? 'bg-[#E8F5E9] text-[#2E7D32]' : i % 3 === 1 ? 'bg-[#E3F2FD] text-[#1976D2]' : 'bg-[#E0F2F1] text-[#00796B]'} p-6 rounded-lg`}>
+                                <span className='flex items-center text-md gap-2 font-light'><FaBox /> {loc.location_name}</span>
+                                <p className='font-bold text-xl'>{loc.stock} {product.unit}</p>
+                            </div>
+                        ))
+                    ) : (
+                        <div className='flex-1 flex flex-col items-start gap-2 bg-gray-50 text-gray-500 p-6 rounded-lg'>
+                            <span className='flex items-center text-md gap-2 font-light'><FaBox /> No stock</span>
+                            <p className='font-bold text-xl'>0 {product.unit}</p>
+                        </div>
+                    )}
+                    <div className='flex-1 flex flex-col items-start gap-2 bg-[#E0F2F1] text-[#00796B] p-6 rounded-lg'>
                         <span className='flex items-center text-md gap-2 font-light'><FaBox /> Total stock</span>
-                        <p className='font-bold text-xl'>450</p>
-                        <p className='font-light text-sm'>Combined inventory</p>
+                        <p className='font-bold text-xl'>{product.total_stock || 0} {product.unit}</p>
                     </div>
                 </div>
             </div>
-            <div className='mx-auto mt-10 flex w-full max-w-5xl flex-col gap-6 rounded-xl bg-white p-6'>
-                <h2 className='font-bold text-xl mb-4'>Recent History</h2>
-                <div className='flex w-full flex-col justify-between gap-2 rounded-xl bg-gray-50 px-4 py-6 sm:flex-row sm:items-center'>
-                    <span >
-                        <p className='font-semibold mb-2'>Last purchase</p>
-                        <p className='text-sm text-gray-400'>{new Date().toLocaleDateString()} • 50 units</p>
-                    </span>
-                    <p className='text-green-600 font-semibold'>₹1270</p>
+
+            {product.batches && product.batches.length > 0 && (
+                <div className='w-[75%] mx-auto mt-10 rounded-xl bg-white p-6 flex flex-col gap-4'>
+                    <h2 className='font-bold text-xl mb-2'>Active Batches</h2>
+                    <table className='w-full'>
+                        <thead className='bg-gray-50'>
+                            <tr>
+                                <th className='text-left p-3 text-sm font-semibold'>Batch No</th>
+                                <th className='text-left p-3 text-sm font-semibold'>Location</th>
+                                <th className='text-left p-3 text-sm font-semibold'>Remaining</th>
+                                <th className='text-left p-3 text-sm font-semibold'>Rate</th>
+                                <th className='text-left p-3 text-sm font-semibold'>Expiry</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {product.batches.map(b => (
+                                <tr key={b.id} className='border-t hover:bg-gray-50 duration-150'>
+                                    <td className='p-3 text-sm'>{b.batch_no}</td>
+                                    <td className='p-3 text-sm'>{b.location_name}</td>
+                                    <td className='p-3 text-sm'>{b.quantity_remaining} / {b.quantity_initial}</td>
+                                    <td className='p-3 text-sm'>₹{b.buying_rate}</td>
+                                    <td className='p-3 text-sm'>{b.expire_date || '—'}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
-                <div className='flex w-full flex-col justify-between gap-2 rounded-xl bg-gray-50 px-4 py-6 sm:flex-row sm:items-center'>
-                    <span >
-                        <p className='font-semibold mb-2'>Last sale</p>
-                        <p className='text-sm text-gray-400'>{new Date().toLocaleDateString()} • 5 units</p>
-                    </span>
-                    <p className='text-green-600 font-semibold'>₹250</p>
-                </div>
-                <div className='flex w-full flex-col justify-between gap-2 rounded-xl bg-gray-50 px-4 py-6 sm:flex-row sm:items-center'>
-                    <span >
-                        <p className='font-semibold mb-2'>Last adjustment</p>
-                        <p className='text-sm text-gray-400'>{new Date().toLocaleDateString()} • 5 units (Damaged)</p>
-                    </span>
-                    <p className='text-red-600 font-semibold'>- ₹50</p>
-                </div>
-            </div>
+            )}
         </div>
     )
 }
