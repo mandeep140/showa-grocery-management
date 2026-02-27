@@ -1,102 +1,33 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { getCurrentServerURL, reconnectToServer } from '../util/api';
-import { findServerIP, verifyServerIP } from '../util/FindIP';
+import { useState, useEffect, useCallback } from 'react';
+import connectionManager from '../util/ConnectionManager';
 
-/**
- * Hook to manage server connection status
- */
 export function useServerConnection() {
-  const [serverURL, setServerURL] = useState(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  const [error, setError] = useState(null);
+  const [status, setStatus] = useState(() => connectionManager.getStatus());
+  const [serverURL, setServerURL] = useState(() => connectionManager.getServerURL());
 
-  // Check connection on mount
   useEffect(() => {
-    checkConnection();
+    const handler = (e) => {
+      setStatus(e.detail.status);
+      setServerURL(e.detail.serverURL);
+    };
+    window.addEventListener('connection-status-change', handler);
+    return () => window.removeEventListener('connection-status-change', handler);
   }, []);
 
-  const checkConnection = async () => {
-    try {
-      const url = getCurrentServerURL();
-      if (url) {
-        setServerURL(url);
-        const isValid = await verifyServerIP();
-        setIsConnected(isValid);
-        
-        if (!isValid) {
-          setError('Server not responding');
-        } else {
-          setError(null);
-        }
-      } else {
-        setIsConnected(false);
-        setError('No server configured');
-      }
-    } catch (err) {
-      setIsConnected(false);
-      setError(err.message);
-    }
-  };
-
-  const searchForServer = async () => {
-    setIsSearching(true);
-    setError(null);
-    
-    try {
-      const ip = await findServerIP();
-      if (ip) {
-        const url = `http://${ip}:24034`;
-        setServerURL(url);
-        setIsConnected(true);
-        setError(null);
-      } else {
-        setError('Server not found on this network');
-        setIsConnected(false);
-      }
-    } catch (err) {
-      setError(err.message);
-      setIsConnected(false);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const reconnect = async () => {
-    setIsSearching(true);
-    setError(null);
-    
-    try {
-      const url = await reconnectToServer();
-      if (url) {
-        setServerURL(url);
-        setIsConnected(true);
-        setError(null);
-      }
-    } catch (err) {
-      setError(err.message);
-      setIsConnected(false);
-    } finally {
-      setIsSearching(false);
-    }
-  };
+  const reconnect = useCallback(() => connectionManager.forceReconnect(), []);
 
   return {
+    status,         
     serverURL,
-    isConnected,
-    isSearching,
-    error,
-    checkConnection,
-    searchForServer,
-    reconnect
+    isConnected: status === 'connected',
+    isReconnecting: status === 'reconnecting' || status === 'connecting',
+    reconnect,
   };
 }
 
-/**
- * Hook for API error handling with network detection
- */
+
 export function useApiError() {
   const [error, setError] = useState(null);
   const [isNetworkError, setIsNetworkError] = useState(false);
@@ -119,10 +50,5 @@ export function useApiError() {
     setIsNetworkError(false);
   };
 
-  return {
-    error,
-    isNetworkError,
-    handleError,
-    clearError
-  };
+  return { error, isNetworkError, handleError, clearError };
 }

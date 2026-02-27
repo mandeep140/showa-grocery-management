@@ -15,7 +15,6 @@ export default function RolesPage() {
   });
   const [error, setError] = useState('');
 
-  // Available permissions — must match backend requirePermission() keys
   const availablePermissions = [
     { id: 'inventory_view', label: 'View Products & Stock', category: 'Inventory' },
     { id: 'inventory_create', label: 'Add Products', category: 'Inventory' },
