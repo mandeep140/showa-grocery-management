@@ -1,4 +1,4 @@
-import { FiCalendar, FiPrinter } from 'react-icons/fi'
+import { FiCalendar } from 'react-icons/fi'
 import { LuFileOutput, LuFilter } from 'react-icons/lu'
 
 const cardClass = 'rounded-xl border border-[#DCE8E7] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]'
@@ -25,7 +25,7 @@ export function DateRangeCard() {
 export function TabsCard({ tabs, activeTab, setActiveTab }) {
   return (
     <section className='mt-4 overflow-hidden rounded-xl border border-[#DCE8E7] bg-white shadow-[0px_1px_2px_-1px_#0000001A,0px_1px_3px_0px_#0000001A]'>
-      <div className='grid grid-cols-4'>
+      <div className='grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'>
         {tabs.map((tab) => {
           const Icon = tab.icon
           const active = activeTab === tab.id
@@ -34,7 +34,7 @@ export function TabsCard({ tabs, activeTab, setActiveTab }) {
               key={tab.id}
               type='button'
               onClick={() => setActiveTab(tab.id)}
-              className={`flex h-[58.5px] w-full items-center justify-center gap-2 border-r border-[#E6ECEB] border-b-4 pt-4 pr-6 pb-1 pl-6 text-center text-[15px] leading-[22.5px] font-bold last:border-r-0 ${
+              className={`flex h-12 w-full items-center justify-center gap-2 border-b-4 px-3 text-center text-xs font-bold sm:h-[58.5px] sm:px-4 sm:text-sm lg:text-[15px] lg:leading-[22.5px] ${
                 active ? 'border-b-[#008C83] bg-[#E7FAF8] text-[#008C83]' : 'border-b-transparent text-[#7F8A89] hover:bg-[#FAFCFC]'
               }`}
             >
@@ -81,8 +81,8 @@ export function ReportTable({ content, pillStyles }) {
     <section className={`${cardClass} mt-5 overflow-hidden`}>
       <div className='flex flex-wrap items-center justify-between gap-3 border-b border-[#ECECEC] bg-[#F5F5F5] px-4 py-3'>
         <p className='text-sm font-semibold text-[#2C2C2C]'>{content.title}</p>
-        <div className='flex gap-2'>
-          <button className='inline-flex h-[37px] w-[129.9125px] items-center justify-center gap-1 rounded-[10px] bg-[#4CAF50] text-xs font-semibold text-white'>
+        <div className='flex w-full gap-2 sm:w-auto'>
+          <button className='inline-flex h-[37px] w-full items-center justify-center gap-1 rounded-[10px] bg-[#4CAF50] px-3 text-xs font-semibold text-white sm:w-auto'>
             <LuFileOutput className='h-3.5 w-3.5' />
             Export CSV
           </button>
@@ -90,7 +90,7 @@ export function ReportTable({ content, pillStyles }) {
       </div>
 
       <div className='overflow-x-auto'>
-        <table className='w-full min-w-215 text-left'>
+        <table className='w-full min-w-[720px] text-left sm:min-w-[860px]'>
           <thead className='bg-[#F5F5F5] text-xs uppercase tracking-wide text-[#748087]'>
             <tr>
               {content.headers.map((header, idx) => (
