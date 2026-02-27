@@ -7,6 +7,7 @@ import { CiSearch } from "react-icons/ci"
 import { FaEye } from "react-icons/fa"
 import { GoPencil } from "react-icons/go"
 import { FiTrash2 } from "react-icons/fi"
+import { IoChevronDown } from "react-icons/io5"
 import Link from 'next/link'
 import Image from 'next/image'
 import { RiFolderReduceFill } from "react-icons/ri"
@@ -158,7 +159,7 @@ const Inventory = () => {
                             className='flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white p-3 text-left lg:min-w-52'
                         >
                             <span>{selectedCategoryLabel}</span>
-                            <span className='text-xs text-gray-500'>?</span>
+                            <IoChevronDown className='text-sm text-gray-500' />
                         </button>
                         {categoryDropdownOpen && (
                             <div className='absolute left-0 right-0 top-full z-50 mt-1 max-h-52 overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-lg'>
@@ -288,4 +289,3 @@ const Inventory = () => {
 }
 
 export default Inventory
-
