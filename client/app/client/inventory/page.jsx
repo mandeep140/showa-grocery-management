@@ -770,6 +770,9 @@ const inventoryData = [
     }
 ]
 
+const CURRENT_TIME = Date.now()
+const EXPIRY_WARNING_WINDOW = 1000 * 60 * 60 * 24 * 10
+
 
 
 const Inventory = () => {
@@ -814,28 +817,28 @@ const Inventory = () => {
     }
 
     return (
-        <div className='w-full min-h-screen px-15 py-30 bg-[#E6FFFD]'>
-            <span className='w-full flex items-center justify-between gap-4 mb-10'>
-                <h2 className='font-semibold text-4xl'>Inventory</h2>
-                <span className='gap-2 flex'>
-                    <Link href="/client/inventory/reduce" className='bg-white px-5 hover:bg-gray-100 py-2 rounded-lg duration-200 cursor-pointer flex gap-2 items-center'><RiFolderReduceFill /> Reduce</Link>
-                    <Link href="/client/inventory/return" className='bg-white px-5 hover:bg-gray-100 py-2 rounded-lg duration-200 cursor-pointer flex gap-2 items-center'><VscDebugRestart /> Return</Link>
-                    <Link href="/client/inventory/transfer" className='bg-white px-5 hover:bg-gray-100 py-2 rounded-lg duration-200 cursor-pointer flex gap-2 items-center'><BiTransfer /> Transfer</Link>
-                    <Link href="/client/inventory/add" className='bg-[#008C83] px-5 hover:bg-[#00675B] text-white py-2 rounded-lg duration-200 cursor-pointer flex gap-2 items-center'><IoMdAdd /> Add Product</Link>
+        <div className='w-full min-h-screen bg-[#E6FFFD] px-4 py-20 sm:px-6 lg:px-10'>
+            <span className='mb-8 flex w-full flex-col gap-4 lg:mb-10 lg:flex-row lg:items-center lg:justify-between'>
+                <h2 className='text-3xl font-semibold sm:text-4xl'>Inventory</h2>
+                <span className='flex flex-wrap gap-2'>
+                    <Link href="/client/inventory/reduce" className='flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm duration-200 hover:bg-gray-100 sm:px-5'><RiFolderReduceFill /> Reduce</Link>
+                    <Link href="/client/inventory/return" className='flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm duration-200 hover:bg-gray-100 sm:px-5'><VscDebugRestart /> Return</Link>
+                    <Link href="/client/inventory/transfer" className='flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm duration-200 hover:bg-gray-100 sm:px-5'><BiTransfer /> Transfer</Link>
+                    <Link href="/client/inventory/add" className='flex items-center gap-2 rounded-lg bg-[#008C83] px-4 py-2 text-sm text-white duration-200 hover:bg-[#00675B] sm:px-5'><IoMdAdd /> Add Product</Link>
                 </span>
             </span>
 
             {/* search box section */}
-            <div className='w-full h-20 bg-white rounded-lg flex items-center justify-between px-8'>
-                <span className='p-4 border border-gray-200 rounded-xl flex items-center justify-center w-[70%]'>
+            <div className='flex w-full flex-col gap-3 rounded-lg bg-white px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between'>
+                <span className='flex w-full items-center justify-center rounded-xl border border-gray-200 p-3 lg:w-[70%]'>
                     <CiSearch />
                     <input type="text" placeholder={`Search by product name or barcode`} className='ml-2 w-full h-full border-none outline-none' />
                 </span>
-                <button className='p-3 rounded-lg ml-auto border border-gray-300'>Scan Barcode</button>
+                <button className='rounded-lg border border-gray-300 px-4 py-3 text-sm'>Scan Barcode</button>
 
                 {/* category filters */}
                 <div>
-                    <select className='ml-4 p-3 rounded-lg border border-gray-300'>
+                    <select className='w-full rounded-lg border border-gray-300 p-3 text-sm lg:ml-2 lg:min-w-44'>
                         <option value="">All Categories</option>
                         <option value="fruits">Fruits</option>
                         <option value="vegetables">Vegetables</option>
@@ -846,7 +849,8 @@ const Inventory = () => {
             </div>
 
             <div>
-                <table className='w-full mt-6 bg-white rounded-t-lg overflow-hidden'>
+                <div className='mt-6 overflow-x-auto rounded-t-lg bg-white'>
+                <table className='w-full min-w-[900px] overflow-hidden'>
                     <thead className='bg-[#F5F5F5] '>
                         <tr>
                             <th className='text-left p-4 font-semibold'>Product Name</th>
@@ -861,19 +865,19 @@ const Inventory = () => {
                     </thead>
                     <tbody>
                         {paginatedData.map((item, index) => (
-                            <tr key={index} className={`border-t ${item.shopStock === 0 ? 'bg-red-200' : new Date(item.expireDate) < Date.now() ? 'bg-red-100' : (Date.now() + 1000 * 60 * 60 * 24 * 10) > item.expireDate ? 'bg-orange-100' : item.shopStock < item.minStock ? 'bg-yellow-100' : 'hover:bg-gray-50'} duration-200 `}>
-                                <td className='p-6 text-sm'>{item.name}</td>
-                                <td className='p-6 text-sm'>{item.category}</td>
-                                <td className='p-6 text-sm'>{item.shopStock} {item.unit}</td>
-                                <td className='p-6 text-sm'>{item.storageStock} {item.unit}</td>
-                                <td className='p-6 text-sm'>{item.minStock} {item.unit}</td>
-                                <td className='p-6 text-sm'>{new Date(item.expireDate).toLocaleDateString()}</td>
-                                <td className='p-6 text-sm'>
+                            <tr key={index} className={`border-t ${item.shopStock === 0 ? 'bg-red-200' : new Date(item.expireDate) < CURRENT_TIME ? 'bg-red-100' : (CURRENT_TIME + EXPIRY_WARNING_WINDOW) > item.expireDate ? 'bg-orange-100' : item.shopStock < item.minStock ? 'bg-yellow-100' : 'hover:bg-gray-50'} duration-200 `}>
+                                <td className='p-4 text-sm'>{item.name}</td>
+                                <td className='p-4 text-sm'>{item.category}</td>
+                                <td className='p-4 text-sm'>{item.shopStock} {item.unit}</td>
+                                <td className='p-4 text-sm'>{item.storageStock} {item.unit}</td>
+                                <td className='p-4 text-sm'>{item.minStock} {item.unit}</td>
+                                <td className='p-4 text-sm'>{new Date(item.expireDate).toLocaleDateString()}</td>
+                                <td className='p-4 text-sm'>
                                     {item.shopStock === 0 ? (
                                         <span className='text-red-600 font-medium'>Out of Stock</span>
-                                    ) : (new Date(item.expireDate) < Date.now()) ? (
+                                    ) : (new Date(item.expireDate) < CURRENT_TIME) ? (
                                         <span className='text-red-600 font-medium'>Expired</span>
-                                    ) : (Date.now() + 1000 * 60 * 60 * 24 * 10) > item.expireDate ? (
+                                    ) : (CURRENT_TIME + EXPIRY_WARNING_WINDOW) > item.expireDate ? (
                                         <span className='text-orange-600 font-medium'>Expiring Soon</span>
                                     ) : item.shopStock < item.minStock ? (
                                         <span className='text-yellow-600 font-medium'>Low Stock</span>
@@ -881,7 +885,7 @@ const Inventory = () => {
                                         <span className='text-green-600 font-medium'>In Stock</span>
                                     )}
                                 </td>
-                                <td className='p-6 text-sm gap-4 flex items-center justify-start'>
+                                <td className='flex items-center justify-start gap-4 p-4 text-sm'>
                                     <Link href={`/client/inventory/${encodeURIComponent(item.name)}/view`} className='text-lg text-green-500 cursor-pointer'><FaEye /></Link>
                                     <Link href={`/client/inventory/${encodeURIComponent(item.name)}/edit`} className='text-lg text-gray-500 cursor-pointer'><GoPencil /></Link>
                                 </td>
@@ -889,27 +893,28 @@ const Inventory = () => {
                         ))}
                     </tbody>
                 </table>
-                <div className="pt-7 pb-4 px-4 rounded-b-lg flex justify-between items-center bg-[#FAFAFA]">
-                    <p className='font-light text-md tracking-wide'>showing {paginatedData.length} of {inventoryData.length} items</p>
-                    <div className='flex justify-center items-center gap-4'>
+                </div>
+                <div className="flex flex-col items-start justify-between gap-3 rounded-b-lg bg-[#FAFAFA] px-4 pb-4 pt-5 sm:flex-row sm:items-center">
+                    <p className='text-sm font-light tracking-wide'>showing {paginatedData.length} of {inventoryData.length} items</p>
+                    <div className='flex flex-wrap items-center justify-center gap-2 sm:gap-4'>
                         <button
                             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                             disabled={currentPage === 1}
-                            className="px-4 py-2 mx-1 bg-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300"
+                            className="rounded-lg border border-gray-300 bg-gray-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
                         >
                             Previous
                         </button>
-                        <div>
+                        <div className='flex items-center'>
                             {getPageNumbers().map((page, index) => (
                                 page === '...' ? (
-                                    <span key={`ellipsis-${index}`} className="px-4 py-2 mx-1">
+                                    <span key={`ellipsis-${index}`} className="px-2 py-2 text-sm sm:px-3">
                                         ...
                                     </span>
                                 ) : (
                                     <button
                                         key={page}
                                         onClick={() => setCurrentPage(page)}
-                                        className={`px-4 py-2 mx-1 rounded-lg ${currentPage === page ? 'bg-[#008C83] text-white' : 'bg-gray-300'}`}
+                                        className={`mx-1 rounded-lg px-3 py-2 text-sm sm:px-4 ${currentPage === page ? 'bg-[#008C83] text-white' : 'bg-gray-300'}`}
                                     >
                                         {page}
                                     </button>
@@ -919,7 +924,7 @@ const Inventory = () => {
                         <button
                             onClick={() => setCurrentPage((prev) => prev + 1)}
                             disabled={currentPage === totalPages}
-                            className="px-4 py-2 mx-1 bg-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300"
+                            className="rounded-lg border border-gray-300 bg-gray-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
                         >
                             Next
                         </button>
