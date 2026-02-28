@@ -1,0 +1,17 @@
+{
+  "name": "showa-grocery-management",
+  "version": "1.0.0",
+  "description": "Showa Grocery Management System",
+  "private": true,
+  "scripts": {
+    "client": "cd client && npm run dev",
+    "admin": "cd admin && npm run dev",
+    "backend": "cd backend && node server.js",
+    "build:client": "cd client && npm run build",
+    "build:admin": "cd admin && npm run build",
+    "build:all": "npm run build:client && npm run build:admin",
+    "install:all": "cd backend && npm install && cd ../client && npm install && cd ../admin && npm install"
+  },
+  "author": "Mandeep",
+  "license": "ISC"
+}

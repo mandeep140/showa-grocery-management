@@ -16,7 +16,6 @@ const BarcodeScanner = ({ isOpen, onClose, onBarcodeScanned }) => {
   const cameraContainerRef = useRef(null)
   const lastScanTime = useRef(0)
 
-  // Beep sound using audio file
   const playBeep = useCallback(() => {
     try {
       const audio = new Audio('/audio/beep.mp3')
@@ -26,11 +25,9 @@ const BarcodeScanner = ({ isOpen, onClose, onBarcodeScanned }) => {
     }
   }, [])
 
-  // Handle barcode result (from both scanner and camera)
   const handleBarcode = useCallback((code) => {
     const now = Date.now()
-    // Debounce: ignore if same barcode scanned within 1 second
-    if (now - lastScanTime.current < 1000) return
+    if (now - lastScanTime.current < 1500) return
     lastScanTime.current = now
 
     setLastScanned(code)
@@ -42,17 +39,14 @@ const BarcodeScanner = ({ isOpen, onClose, onBarcodeScanned }) => {
       } else {
         setScanStatus(`✗ Product not found: ${code}`)
       }
-      // Clear status after 2 seconds
       setTimeout(() => setScanStatus(''), 2000)
     })
   }, [onBarcodeScanned, playBeep])
 
-  // Hardware barcode scanner listener (reads as keyboard input)
   useEffect(() => {
     if (!isOpen) return
 
     const handleKeyDown = (e) => {
-      // Ignore if user is typing in an input field that's not part of the scanner
       const tag = e.target.tagName.toLowerCase()
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return
 
@@ -66,12 +60,10 @@ const BarcodeScanner = ({ isOpen, onClose, onBarcodeScanned }) => {
         return
       }
 
-      // Only accept printable characters
       if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault()
         barcodeBuffer.current += e.key
 
-        // Reset buffer after 100ms of no input (scanner types fast)
         if (barcodeTimeout.current) clearTimeout(barcodeTimeout.current)
         barcodeTimeout.current = setTimeout(() => {
           barcodeBuffer.current = ''
@@ -86,7 +78,6 @@ const BarcodeScanner = ({ isOpen, onClose, onBarcodeScanned }) => {
     }
   }, [isOpen, handleBarcode])
 
-  // Helper to safely stop and clear scanner
   const cleanupCamera = useCallback(() => {
     const scanner = html5QrCodeRef.current
     if (!scanner) return
@@ -102,7 +93,6 @@ const BarcodeScanner = ({ isOpen, onClose, onBarcodeScanned }) => {
       })
   }, [])
 
-  // Camera scanner
   useEffect(() => {
     if (!isOpen || mode !== 'camera') {
       cleanupCamera()
@@ -114,11 +104,9 @@ const BarcodeScanner = ({ isOpen, onClose, onBarcodeScanned }) => {
 
     const startCamera = async () => {
       try {
-        // Request camera permission explicitly first
         try {
           await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
             .then(stream => {
-              // Stop the stream immediately, html5-qrcode will open its own
               stream.getTracks().forEach(track => track.stop())
             })
         } catch (permErr) {
@@ -132,7 +120,6 @@ const BarcodeScanner = ({ isOpen, onClose, onBarcodeScanned }) => {
         const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode')
         if (!mounted) return
 
-        // Wait a bit for DOM to be ready
         await new Promise(r => setTimeout(r, 300))
         if (!mounted) return
 
@@ -185,7 +172,6 @@ const BarcodeScanner = ({ isOpen, onClose, onBarcodeScanned }) => {
     }
   }, [isOpen, mode, handleBarcode, cleanupCamera, retryCount])
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       cleanupCamera()
@@ -195,7 +181,7 @@ const BarcodeScanner = ({ isOpen, onClose, onBarcodeScanned }) => {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 px-4">
+    <div className="fixed inset-0 z-90 flex items-center justify-center bg-black/50 px-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
@@ -258,7 +244,7 @@ const BarcodeScanner = ({ isOpen, onClose, onBarcodeScanned }) => {
               <div
                 id="barcode-camera-view"
                 ref={cameraContainerRef}
-                className="w-full rounded-lg overflow-hidden bg-black min-h-[250px]"
+                className="w-full rounded-lg overflow-hidden bg-black min-h-62 max-h-[40vh]"
               />
               {cameraError && (
                 <div className="mt-3 text-center">

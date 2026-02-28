@@ -20,6 +20,7 @@ const Dashboard = () => {
   const [expiring, setExpiring] = useState({ expiring: [], expired: [] })
   const [activities, setActivities] = useState([])
   const [loading, setLoading] = useState(true)
+  const [expandedPanel, setExpandedPanel] = useState(null)
 
   useEffect(() => {
     const load = async () => {
@@ -95,14 +96,14 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
         {/* Low Stock */}
         <div className="rounded-xl border border-[#FFE0B2] bg-white overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 bg-[#FFF3E0] border-b border-[#FFE0B2]">
+          <button type="button" onClick={() => setExpandedPanel(expandedPanel === 'lowstock' ? null : 'lowstock')} className="w-full flex items-center gap-2 px-4 py-3 bg-[#FFF3E0] border-b border-[#FFE0B2] cursor-pointer hover:bg-[#FFEDCC] duration-150">
             <IoWarningOutline className="text-[#FF9800]" />
             <span className="text-sm font-semibold text-gray-700">Low Stock</span>
             <span className="ml-auto text-xs font-bold text-white bg-[#FF9800] rounded-full w-5 h-5 flex items-center justify-center">{lowStockOnly.length}</span>
-          </div>
-          <div className="max-h-64 overflow-y-auto p-3 space-y-2">
+          </button>
+          <div className={`${expandedPanel === 'lowstock' ? 'max-h-[70vh]' : 'max-h-64'} overflow-y-auto p-3 space-y-2 transition-all duration-300`}>
             {lowStockOnly.length === 0 && <p className="text-xs text-gray-400 text-center py-4">No low stock items</p>}
-            {lowStockOnly.slice(0, 10).map(item => (
+            {(expandedPanel === 'lowstock' ? lowStockOnly : lowStockOnly.slice(0, 10)).map(item => (
               <div key={item.id} className="flex items-center justify-between px-3 py-2 bg-[#FFFBF5] border border-[#FFE0B2] rounded-lg">
                 <div>
                   <p className="text-xs font-medium text-gray-700">{item.name}</p>
@@ -111,19 +112,24 @@ const Dashboard = () => {
                 <p className="text-xs font-semibold text-[#FF9800]">{item.total_stock} / {item.minimum_stock_level}</p>
               </div>
             ))}
+            {!expandedPanel && lowStockOnly.length > 10 && (
+              <button type="button" onClick={() => setExpandedPanel('lowstock')} className="w-full text-center text-xs text-[#FF9800] font-medium py-2 hover:underline cursor-pointer">
+                View all {lowStockOnly.length} items
+              </button>
+            )}
           </div>
         </div>
 
         {/* Expiring Soon */}
         <div className="rounded-xl border border-[#FFCDD2] bg-white overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 bg-[#FFEBEE] border-b border-[#FFCDD2]">
+          <button type="button" onClick={() => setExpandedPanel(expandedPanel === 'expiring' ? null : 'expiring')} className="w-full flex items-center gap-2 px-4 py-3 bg-[#FFEBEE] border-b border-[#FFCDD2] cursor-pointer hover:bg-[#FFDDE1] duration-150">
             <FaRegClock className="text-[#EF5350]" />
             <span className="text-sm font-semibold text-gray-700">Expiring Soon</span>
             <span className="ml-auto text-xs font-bold text-white bg-[#EF5350] rounded-full w-5 h-5 flex items-center justify-center">{expiringAll.length}</span>
-          </div>
-          <div className="max-h-64 overflow-y-auto p-3 space-y-2">
+          </button>
+          <div className={`${expandedPanel === 'expiring' ? 'max-h-[70vh]' : 'max-h-64'} overflow-y-auto p-3 space-y-2 transition-all duration-300`}>
             {expiringAll.length === 0 && <p className="text-xs text-gray-400 text-center py-4">No expiring items</p>}
-            {expiringAll.slice(0, 10).map((item, i) => (
+            {(expandedPanel === 'expiring' ? expiringAll : expiringAll.slice(0, 10)).map((item, i) => (
               <div key={i} className="flex items-center justify-between px-3 py-2 bg-[#FFF5F5] border border-[#FFCDD2] rounded-lg">
                 <div>
                   <p className="text-xs font-medium text-gray-700">{item.product_name || item.name}</p>
@@ -132,19 +138,24 @@ const Dashboard = () => {
                 <p className="text-xs font-semibold text-[#EF5350]">{item.expire_date ? new Date(item.expire_date).toLocaleDateString('en-IN') : '—'}</p>
               </div>
             ))}
+            {!expandedPanel && expiringAll.length > 10 && (
+              <button type="button" onClick={() => setExpandedPanel('expiring')} className="w-full text-center text-xs text-[#EF5350] font-medium py-2 hover:underline cursor-pointer">
+                View all {expiringAll.length} items
+              </button>
+            )}
           </div>
         </div>
 
         {/* Out of Stock */}
         <div className="rounded-xl border border-[#FFCDD2] bg-white overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 bg-[#FFEBEE] border-b border-[#FFCDD2]">
+          <button type="button" onClick={() => setExpandedPanel(expandedPanel === 'outofstock' ? null : 'outofstock')} className="w-full flex items-center gap-2 px-4 py-3 bg-[#FFEBEE] border-b border-[#FFCDD2] cursor-pointer hover:bg-[#FFDDE1] duration-150">
             <FaBox className="text-[#EF5350]" />
             <span className="text-sm font-semibold text-gray-700">Out of Stock</span>
             <span className="ml-auto text-xs font-bold text-white bg-[#EF5350] rounded-full w-5 h-5 flex items-center justify-center">{outOfStock.length}</span>
-          </div>
-          <div className="max-h-64 overflow-y-auto p-3 space-y-2">
+          </button>
+          <div className={`${expandedPanel === 'outofstock' ? 'max-h-[70vh]' : 'max-h-64'} overflow-y-auto p-3 space-y-2 transition-all duration-300`}>
             {outOfStock.length === 0 && <p className="text-xs text-gray-400 text-center py-4">All products in stock</p>}
-            {outOfStock.slice(0, 10).map(item => (
+            {(expandedPanel === 'outofstock' ? outOfStock : outOfStock.slice(0, 10)).map(item => (
               <div key={item.id} className="flex items-center justify-between px-3 py-2 bg-[#FFF5F5] border border-[#FFCDD2] rounded-lg">
                 <div>
                   <p className="text-xs font-medium text-gray-700">{item.name}</p>
@@ -153,6 +164,11 @@ const Dashboard = () => {
                 <p className="text-xs font-semibold text-[#EF5350]">Out of Stock</p>
               </div>
             ))}
+            {!expandedPanel && outOfStock.length > 10 && (
+              <button type="button" onClick={() => setExpandedPanel('outofstock')} className="w-full text-center text-xs text-[#EF5350] font-medium py-2 hover:underline cursor-pointer">
+                View all {outOfStock.length} items
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -93,6 +93,7 @@ export function buildPurchaseContent(purchases, summary) {
     headers: ['INVOICE', 'SUPPLIER', 'DATE', 'ITEMS', 'STATUS', 'AMOUNT'],
     countLabel: `Showing ${purchases.length} records`,
     rows: purchases.map(p => ({
+      id: p.id,
       invoice: p.invoice_number || `PUR-${p.id}`,
       supplier: p.seller_name || '—',
       date: new Date(p.created_at + ' UTC').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),

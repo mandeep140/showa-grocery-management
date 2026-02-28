@@ -43,23 +43,23 @@ const ViewPurchase = () => {
         <IoMdArrowBack /> &nbsp; Back to purchases
       </Link>
 
-      <div className='mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between'>
+      <div className='mb-6 sm:mb-8 flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between'>
         <div>
-          <h1 className='text-2xl font-bold sm:text-3xl'>Purchase Order</h1>
-          <p className='mt-1 text-sm text-gray-400'>{purchase.invoice_number}</p>
+          <h1 className='text-xl font-bold sm:text-2xl lg:text-3xl'>Purchase Order</h1>
+          <p className='mt-1 text-xs sm:text-sm text-gray-400'>{purchase.invoice_number}</p>
         </div>
-        <div className='w-full md:w-auto'>
-          <Link href={`/client/purchase/${id}/edit`} className='flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-sm font-semibold duration-150 hover:bg-gray-50 md:w-auto'>
+        <div className='w-full sm:w-auto'>
+          <Link href={`/client/purchase/${id}/edit`} className='flex h-10 sm:h-11 w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-sm font-semibold duration-150 hover:bg-gray-50 sm:w-auto'>
             <GoPencil /> Edit
           </Link>
         </div>
       </div>
 
-      <div className='flex flex-col items-start gap-6 xl:flex-row'>
+      <div className='flex flex-col items-start gap-4 sm:gap-6 lg:flex-row'>
         <div className='flex flex-1 flex-col gap-6'>
-          <div className='rounded-xl bg-white p-4 shadow-sm sm:p-6'>
-            <h2 className='mb-6 text-lg font-bold'>Order Details</h2>
-            <div className='grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2'>
+          <div className='rounded-xl bg-white p-3 shadow-sm sm:p-4 lg:p-6'>
+            <h2 className='mb-4 sm:mb-6 text-base sm:text-lg font-bold'>Order Details</h2>
+            <div className='grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2'>
               <div>
                 <p className='text-sm text-gray-400'>Invoice Number</p>
                 <p className='font-medium'>{purchase.invoice_number}</p>
@@ -99,13 +99,13 @@ const ViewPurchase = () => {
             )}
           </div>
 
-          <div className='rounded-xl bg-white p-4 shadow-sm sm:p-6'>
-            <h2 className='mb-6 text-lg font-bold'>Items ({items.length})</h2>
+          <div className='rounded-xl bg-white p-3 shadow-sm sm:p-4 lg:p-6'>
+            <h2 className='mb-4 sm:mb-6 text-base sm:text-lg font-bold'>Items ({items.length})</h2>
             {items.length === 0 ? (
               <p className='py-10 text-center text-gray-400'>No items</p>
             ) : (
-              <div className='overflow-x-auto'>
-                <table className='min-w-[860px] w-full text-left'>
+              <div className='overflow-x-auto -mx-3 px-3 sm:-mx-4 sm:px-4 lg:-mx-6 lg:px-6'>
+                <table className='min-w-[640px] w-full text-left'>
                   <thead>
                     <tr className='border-b bg-gray-50'>
                       <th className='p-3 text-sm text-gray-500'>Product</th>
@@ -143,9 +143,9 @@ const ViewPurchase = () => {
           </div>
         </div>
 
-        <div className='w-full xl:w-[320px] xl:sticky xl:top-24 flex flex-col gap-6'>
-          <div className='rounded-xl bg-white p-4 shadow-sm sm:p-6'>
-            <h2 className='mb-5 text-lg font-bold'>Payment Summary</h2>
+        <div className='w-full lg:w-[300px] xl:w-[320px] lg:sticky lg:top-24 flex flex-col gap-4 sm:gap-6'>
+          <div className='rounded-xl bg-white p-3 shadow-sm sm:p-4 lg:p-6'>
+            <h2 className='mb-4 sm:mb-5 text-base sm:text-lg font-bold'>Payment Summary</h2>
             <div className='flex flex-col gap-3 text-sm'>
               <div className='flex items-center justify-between'>
                 <span className='text-gray-500'>Subtotal</span>

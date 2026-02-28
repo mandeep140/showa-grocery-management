@@ -6,6 +6,7 @@ import { CiSearch } from "react-icons/ci"
 import { FaRegEye } from "react-icons/fa"
 import { MdDeleteOutline } from "react-icons/md"
 import { IoChevronDown } from "react-icons/io5"
+import { FiCalendar } from "react-icons/fi"
 import api from '@/util/api'
 
 const Purchase = () => {
@@ -15,14 +16,33 @@ const Purchase = () => {
   const [searchSeller, setSearchSeller] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [paymentDropdownOpen, setPaymentDropdownOpen] = useState(false)
+  const [datePreset, setDatePreset] = useState('')
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
   const paymentDropdownRef = React.useRef(null)
   const perPage = 10
+
+  const getDateRange = (preset) => {
+    const today = new Date()
+    const fmt = (d) => d.toISOString().split('T')[0]
+    switch (preset) {
+      case 'today': return { start_date: fmt(today), end_date: fmt(today) }
+      case '7days': { const d = new Date(today); d.setDate(d.getDate() - 7); return { start_date: fmt(d), end_date: fmt(today) } }
+      case '30days': { const d = new Date(today); d.setDate(d.getDate() - 30); return { start_date: fmt(d), end_date: fmt(today) } }
+      case '90days': { const d = new Date(today); d.setDate(d.getDate() - 90); return { start_date: fmt(d), end_date: fmt(today) } }
+      case 'custom': return { start_date: customStart, end_date: customEnd }
+      default: return {}
+    }
+  }
 
   const fetchPurchases = useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
       if (paymentFilter) params.append('payment_status', paymentFilter)
+      const range = getDateRange(datePreset)
+      if (range.start_date) params.append('start_date', range.start_date)
+      if (range.end_date) params.append('end_date', range.end_date)
       const res = await api.get(`/api/purchases?${params.toString()}`)
       if (res.data.success) setPurchases(res.data.purchases)
     } catch (err) {
@@ -30,7 +50,7 @@ const Purchase = () => {
     } finally {
       setLoading(false)
     }
-  }, [paymentFilter])
+  }, [paymentFilter, datePreset, customStart, customEnd])
 
   useEffect(() => {
     fetchPurchases()
@@ -125,6 +145,53 @@ const Purchase = () => {
         <div className='flex flex-col items-start gap-4 rounded-lg bg-white p-5'>
           <p>Pending Payment</p>
           <p className='text-3xl font-bold text-red-500'>Rs. {totalPending.toLocaleString('en-IN')}</p>
+        </div>
+      </div>
+
+      {/* Date Range Filter */}
+      <div className='mb-6 rounded-lg bg-white p-4 sm:p-5'>
+        <p className='flex items-center gap-2 text-xs font-semibold text-gray-500 mb-3'>
+          <FiCalendar className='h-3.5 w-3.5 text-[#008C83]' /> Date Range
+        </p>
+        <div className='flex flex-wrap items-center gap-2'>
+          {[
+            { key: '', label: 'All Time' },
+            { key: 'today', label: 'Today' },
+            { key: '7days', label: 'Last 7 Days' },
+            { key: '30days', label: 'Last 30 Days' },
+            { key: '90days', label: 'Last 90 Days' },
+            { key: 'custom', label: 'Custom' },
+          ].map(b => (
+            <button
+              key={b.key}
+              type='button'
+              onClick={() => setDatePreset(b.key)}
+              className={`h-8 px-3.5 rounded-lg border text-xs font-medium cursor-pointer duration-150 ${
+                datePreset === b.key
+                  ? 'border-[#008C83] bg-[#E6FFFD] text-[#008C83]'
+                  : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+              }`}
+            >
+              {b.label}
+            </button>
+          ))}
+          {datePreset === 'custom' && (
+            <div className='ml-0 flex w-full flex-col items-stretch gap-2 sm:ml-2 sm:w-auto sm:flex-row sm:items-center'>
+              <input
+                type='date'
+                value={customStart}
+                onChange={(e) => setCustomStart(e.target.value)}
+                className='h-8 rounded-lg border border-gray-200 px-2 text-xs outline-none focus:border-[#008C83]'
+              />
+              <span className='hidden text-xs text-gray-400 sm:inline'>to</span>
+              <input
+                type='date'
+                value={customEnd}
+                onChange={(e) => setCustomEnd(e.target.value)}
+                className='h-8 rounded-lg border border-gray-200 px-2 text-xs outline-none focus:border-[#008C83]'
+              />
+            </div>
+          )}
         </div>
       </div>
 

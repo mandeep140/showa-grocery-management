@@ -183,6 +183,7 @@ const BillingPage = () => {
           } else {
             loadProducts('')
           }
+
         }
       } catch (err) {
         console.error('Failed to load locations:', err)
@@ -190,6 +191,12 @@ const BillingPage = () => {
       }
     }
     init()
+  }, [])
+
+  useEffect(() => {
+    const handleOpenScanner = () => setIsScannerOpen(true)
+    window.addEventListener('open-barcode-scanner', handleOpenScanner)
+    return () => window.removeEventListener('open-barcode-scanner', handleOpenScanner)
   }, [])
 
   const PRODUCTS_PER_PAGE = 50

@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 const GlobalShortcuts = () => {
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     const shortcuts = {
@@ -21,13 +22,17 @@ const GlobalShortcuts = () => {
 
       if (isCmdOrCtrl && shortcuts[key]) {
         event.preventDefault();
+        if (key === "b" && pathname === "/client/billing") {
+          window.dispatchEvent(new CustomEvent("open-barcode-scanner"));
+          return;
+        }
         router.push(shortcuts[key]);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [router]);
+  }, [router, pathname]);
 
   return null;
 };

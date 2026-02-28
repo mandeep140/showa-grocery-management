@@ -1,10 +1,7 @@
-import React from 'react'
-import Link from 'next/link'
+import { redirect } from 'next/navigation'
 
 const page = () => {
-  return (
-    <Link href="/client/dashboard">Go to Dashboard</Link>
-  )
+  redirect('/client/dashboard')
 }
 
 export default page

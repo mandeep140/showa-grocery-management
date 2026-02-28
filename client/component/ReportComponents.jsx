@@ -1,5 +1,6 @@
 import { FiCalendar } from 'react-icons/fi'
 import { LuFileOutput, LuFilter } from 'react-icons/lu'
+import Link from 'next/link'
 
 const cardClass = 'rounded-xl border border-[#DCE8E7] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]'
 const inputClass = 'h-11 w-full rounded-lg border border-[#E5E5E5] px-3 text-sm text-[#2f3b43] outline-none placeholder:text-[#a3adb2] focus:border-[#33B4B1] focus:ring-2 focus:ring-[#33B4B1]/20'
@@ -136,7 +137,11 @@ function DataRow({ type, row, pillStyles }) {
   if (type === 'purchase') {
     return (
       <tr className='border-t border-[#ECECEC] text-sm text-[#2f3b43]'>
-        <td className='px-4 py-3.5 font-medium text-[#14a388]'>{row.invoice}</td>
+        <td className='px-4 py-3.5 font-medium text-[#14a388]'>
+          {row.id ? (
+            <Link href={`/client/purchase/${row.id}/view`} className='hover:underline cursor-pointer'>{row.invoice}</Link>
+          ) : row.invoice}
+        </td>
         <td className='px-4 py-3.5 text-[#5f6a70]'>{row.supplier}</td>
         <td className='px-4 py-3.5'>{row.date}</td>
         <td className='px-4 py-3.5 font-semibold'>{row.items}</td>
@@ -158,7 +163,11 @@ function DataRow({ type, row, pillStyles }) {
   }
   return (
     <tr className='border-t border-[#ECECEC] text-sm text-[#2f3b43]'>
-      <td className='px-4 py-3.5 font-medium text-[#14a388]'>{row.billNumber}</td>
+      <td className='px-4 py-3.5 font-medium text-[#14a388]'>
+        <Link href={`/client/invoice?q=${encodeURIComponent(row.billNumber)}`} className='hover:underline cursor-pointer'>
+          {row.billNumber}
+        </Link>
+      </td>
       <td className='px-4 py-3.5'>
         <p className='font-medium'>{row.date}</p>
         <p className='text-xs text-[#9aa3a8]'>{row.time}</p>

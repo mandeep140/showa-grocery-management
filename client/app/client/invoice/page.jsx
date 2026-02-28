@@ -3,8 +3,16 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { HiMiniMagnifyingGlass, HiOutlineQrCode, HiOutlineXMark } from 'react-icons/hi2'
+import { BiPrinter } from 'react-icons/bi'
 import api from '@/util/api'
 import BarcodeScanner from '@/component/BarcodeScanner'
+import {
+  getPrinterSettings,
+  isPrinterConfigured,
+  buildReceiptData,
+  printReceipt,
+  checkPrinterConnected,
+} from '@/util/thermalPrinter'
 
 const statusColors = {
   completed: 'bg-green-100 text-green-700',
@@ -31,6 +39,7 @@ function InvoicePageContent() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [scannerOpen, setScannerOpen] = useState(false)
+  const [printing, setPrinting] = useState(false)
 
 
   useEffect(() => {
@@ -63,6 +72,39 @@ function InvoicePageContent() {
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') search()
+  }
+
+  const handlePrint = async () => {
+    if (!order) return
+    if (!isPrinterConfigured()) return alert('No printer configured. Go to Settings → Printer to set up.')
+    setPrinting(true)
+    try {
+      await checkPrinterConnected()
+      const settings = getPrinterSettings()
+      const receiptData = buildReceiptData({
+        invoice_id: order.invoice_id,
+        date: order.created_at,
+        customer_name: order.buyer_name || 'Walk-in Customer',
+        payment_method: order.payment_method,
+        items: order.items.map(item => ({
+          name: item.product_name,
+          quantity: item.total_quantity,
+          selling_price: item.selling_price,
+        })),
+        subtotal: order.total_sell_price,
+        tax_amount: order.tax_amount,
+        discount_amount: order.discount_amount,
+        total_amount: order.final_amount,
+        received_amount: order.received_amount,
+        total_items: order.items.length,
+        total_qty: order.items.reduce((s, i) => s + i.total_quantity, 0),
+      }, settings)
+      await printReceipt(receiptData)
+    } catch (err) {
+      alert(`Print failed: ${err.message}`)
+    } finally {
+      setPrinting(false)
+    }
   }
 
 
@@ -122,16 +164,27 @@ function InvoicePageContent() {
                 <h2 className="text-xl font-bold text-gray-800">{order.invoice_id}</h2>
                 <p className="text-sm text-gray-400 mt-0.5">{fmtDate(order.created_at)}</p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${statusColors[order.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                  {order.status}
-                </span>
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${paymentColors[order.payment_status] ?? 'bg-gray-100 text-gray-600'}`}>
-                  {order.payment_status}
-                </span>
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-600">
-                  {paymentMethodLabel[order.payment_method] ?? order.payment_method}
-                </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handlePrint}
+                  disabled={printing}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#008C83] text-white text-xs font-semibold hover:bg-[#007571] duration-150 cursor-pointer disabled:opacity-50"
+                >
+                  <BiPrinter className="h-3.5 w-3.5" />
+                  {printing ? 'Printing...' : 'Print'}
+                </button>
+                {(() => {
+                  const finalStatus = order.payment_status === 'partial' || order.payment_status === 'unpaid'
+                    ? order.payment_status
+                    : order.status
+                  const finalColors = paymentColors[finalStatus] || statusColors[finalStatus] || 'bg-gray-100 text-gray-600'
+                  return (
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${finalColors}`}>
+                      {finalStatus}
+                    </span>
+                  )
+                })()}
               </div>
             </div>
 
