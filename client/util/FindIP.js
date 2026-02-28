@@ -5,10 +5,23 @@ const HEALTH_ENDPOINT = '/api/health';
 const STORAGE_KEY = 'serverConfig';
 
 async function getLocalIPRange() {
-  if (typeof window === 'undefined' || typeof RTCPeerConnection === 'undefined') {
-    return '192.168.1';
-  }
-  
+  if (typeof window === 'undefined') return '192.168.1';
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 2000);
+    const res = await fetch('/api/network-info', { signal: ctrl.signal });
+    clearTimeout(t);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.ip) {
+        const parts = data.ip.split('.');
+        if (parts.length === 4) return `${parts[0]}.${parts[1]}.${parts[2]}`;
+      }
+    }
+  } catch (error) { /* fallback to WebRTC */ }
+
+  if (typeof RTCPeerConnection === 'undefined') return '192.168.1';
+
   try {
     const pc = new RTCPeerConnection({
       iceServers: []
@@ -76,32 +89,44 @@ async function checkServerHealth(ip) {
 
 export async function findServerIP() {
   console.log('Scanning network for server...');
-  
+  const quickIPs = [];
+  const savedIP = loadServerIP();
+  if (savedIP) quickIPs.push(savedIP);
+  quickIPs.push('127.0.0.1');
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    quickIPs.push(window.location.hostname);
+  }
+
+  for (const ip of quickIPs) {
+    if (await checkServerHealth(ip)) {
+      console.log(`Server found at: ${ip}:${SERVER_PORT}`);
+      saveServerIP(ip);
+      return ip;
+    }
+  }
+
   const baseIP = await getLocalIPRange();
-  const promises = [];
-  for (let i = 1; i <= 254; i++) {
-    const ip = `${baseIP}.${i}`;
-    promises.push(
-      checkServerHealth(ip).then(isHealthy => {
-        if (isHealthy) {
+
+  return new Promise((resolve) => {
+    let found = false;
+    let completed = 0;
+
+    for (let i = 1; i <= 254; i++) {
+      const ip = `${baseIP}.${i}`;
+      checkServerHealth(ip).then((isHealthy) => {
+        if (isHealthy && !found) {
+          found = true;
           console.log(`Server found at: ${ip}:${SERVER_PORT}`);
-          return ip;
+          saveServerIP(ip);
+          resolve(ip);
         }
-        return null;
-      })
-    );
-  }
-  
-  const results = await Promise.all(promises);
-  const serverIP = results.find(ip => ip !== null);
-  
-  if (serverIP) {
-    saveServerIP(serverIP);
-    return serverIP;
-  } else {
-    console.log('Server not found on network');
-    return null;
-  }
+        if (++completed === 254 && !found) {
+          console.log('Server not found on network');
+          resolve(null);
+        }
+      });
+    }
+  });
 }
 
 function saveServerIP(ip) {
@@ -164,7 +189,7 @@ export async function ensureServerConnection() {
       return `http://${savedIP}:${SERVER_PORT}`;
     }
   }
-  k
+
   const foundIP = await findServerIP();
   if (foundIP) {
     return `http://${foundIP}:${SERVER_PORT}`;

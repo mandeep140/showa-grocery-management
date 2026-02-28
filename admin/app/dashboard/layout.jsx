@@ -1,9 +1,74 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { loadAuthToken, setAuthToken } from '@/util/api';
+
+function ConnectionStatusBanner() {
+  const [status, setStatus] = useState('connecting');
+  const [show, setShow] = useState(false);
+  const hideTimerRef = useRef(null);
+
+  useEffect(() => {
+    import('@/util/ConnectionManager').then((mod) => {
+      const cm = mod.default;
+      setStatus(cm.getStatus());
+      setShow(cm.getStatus() !== 'connected');
+    });
+
+    const handler = (e) => {
+      const { status: s } = e.detail;
+      setStatus(s);
+
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+
+      if (s === 'connected') {
+        setShow(true);
+        hideTimerRef.current = setTimeout(() => setShow(false), 2000);
+      } else {
+        setShow(true);
+      }
+    };
+
+    window.addEventListener('connection-status-change', handler);
+    return () => {
+      window.removeEventListener('connection-status-change', handler);
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    };
+  }, []);
+
+  if (!show) return null;
+
+  const cfg = {
+    connecting:   { bg: 'bg-yellow-500', text: 'Connecting to server...', pulse: true },
+    reconnecting: { bg: 'bg-yellow-500', text: 'Reconnecting to server...', pulse: true },
+    disconnected: { bg: 'bg-red-600',    text: 'Disconnected from server', pulse: false },
+    connected:    { bg: 'bg-green-600',  text: 'Connected to server',      pulse: false },
+  }[status] || { bg: 'bg-gray-600', text: 'Unknown', pulse: false };
+
+  const handleRetry = async () => {
+    const cm = (await import('@/util/ConnectionManager')).default;
+    cm.forceReconnect();
+  };
+
+  return (
+    <div className={`fixed top-0 left-0 right-0 z-9999 ${cfg.bg} text-white text-sm py-2 px-4 flex items-center justify-center gap-3 shadow-lg transition-all duration-300`}>
+      {cfg.pulse && (
+        <span className='relative flex h-2.5 w-2.5'>
+          <span className='animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75' />
+          <span className='relative inline-flex rounded-full h-2.5 w-2.5 bg-white' />
+        </span>
+      )}
+      <span className='font-medium'>{cfg.text}</span>
+      {status === 'disconnected' && (
+        <button onClick={handleRetry} className='ml-2 px-3 py-0.5 bg-white/20 hover:bg-white/30 rounded text-xs font-semibold transition'>
+          Retry
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
@@ -101,6 +166,7 @@ export default function DashboardLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      <ConnectionStatusBanner />
       {/* Sidebar */}
       <aside
         className={`fixed top-0 left-0 h-full bg-gray-900 shadow-2xl transition-all duration-300 z-40 flex flex-col ${

@@ -13,7 +13,6 @@ router.get('/', verifyToken, requirePermission(['customers', 'billing', 'debts']
       WHERE 1=1`;
     const params = [];
 
-    // Hide walk-in customer unless explicitly requested
     if (!include_walkin && !search) { sql += ` AND b.name != 'Walk-in Customer'`; }
     if (search) { sql += ` AND (b.name LIKE ? OR b.phone LIKE ? OR b.email LIKE ?)`; params.push(`%${search}%`, `%${search}%`, `%${search}%`); }
     if (is_active !== undefined) { sql += ` AND b.is_active = ?`; params.push(is_active); }

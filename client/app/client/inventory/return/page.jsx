@@ -15,14 +15,12 @@ const Return = () => {
   const router = useRouter()
   const [returnType, setReturnType] = useState('customer') // 'customer' | 'seller'
 
-  // Common
   const [locations, setLocations] = useState([])
   const [selectedLocation, setSelectedLocation] = useState('')
   const [locationDropdown, setLocationDropdown] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [reason, setReason] = useState('')
 
-  // Customer return state
   const [returnItems, setReturnItems] = useState([])
   const [cProductSearch, setCProductSearch] = useState('')
   const [cProductResults, setCProductResults] = useState([])
@@ -37,7 +35,6 @@ const Return = () => {
   const cProductSearchTimeout = useRef(null)
   const customerSearchTimeout = useRef(null)
 
-  // Seller return state
   const [sellers, setSellers] = useState([])
   const [sellerSearch, setSellerSearch] = useState('')
   const [showSellerDropdown, setShowSellerDropdown] = useState(false)
@@ -45,7 +42,7 @@ const Return = () => {
   const [productSearch, setProductSearch] = useState('')
   const [productResults, setProductResults] = useState([])
   const [showProductDropdown, setShowProductDropdown] = useState(false)
-  const [sellerItems, setSellerItems] = useState([]) // [{product_id, batch_id, quantity, buying_rate, product_name, batch_no, max_qty}]
+  const [sellerItems, setSellerItems] = useState([]) 
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [batches, setBatches] = useState([])
   const productSearchTimeout = useRef(null)
@@ -137,7 +134,6 @@ const Return = () => {
     setReturnItems(prev => prev.filter((_, i) => i !== index))
   }
 
-  // --- Customer Search (optional for returns) ---
   const searchCustomers = async (query) => {
     if (!query.trim()) return setCustomers([])
     try {
@@ -175,7 +171,6 @@ const Return = () => {
     setRefundMethod('cash')
   }
 
-  // --- Seller Search ---
   const searchSellers = async (query) => {
     if (!query.trim()) return setSellers([])
     try {
@@ -198,7 +193,6 @@ const Return = () => {
     setSellers([])
   }
 
-  // --- Product search for seller returns ---
   const searchProducts = async (query) => {
     if (!query.trim()) return setProductResults([])
     try {
@@ -264,7 +258,6 @@ const Return = () => {
     setSellerItems(prev => prev.filter((_, i) => i !== index))
   }
 
-  // --- Submit ---
   const handleCustomerReturn = async () => {
     if (submitting) return
     if (!selectedLocation) return alert('Select a location')
