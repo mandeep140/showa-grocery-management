@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { tabs, pillStyles, money, buildSalesContent, buildInventoryContent, buildPurchaseContent, buildLossContent, buildReturnsContent } from './report-config'
 import { SummaryCards, TabsCard, ReportTable } from '@/component/ReportComponents'
 import { FiCalendar } from 'react-icons/fi'
@@ -41,11 +41,7 @@ export default function ReportsPage() {
   const [content, setContent] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadReport()
-  }, [activeTab, datePreset, customStart, customEnd])
-
-  const loadReport = async () => {
+  const loadReport = useCallback(async () => {
     setLoading(true)
     const range = datePreset === 'custom'
       ? { start_date: customStart, end_date: customEnd }
@@ -103,7 +99,11 @@ export default function ReportsPage() {
       }
     } catch (err) { console.error(err) }
     finally { setLoading(false) }
-  }
+  }, [activeTab, datePreset, customStart, customEnd])
+
+  useEffect(() => {
+    loadReport()
+  }, [loadReport])
 
   const dateButtons = [
     { key: 'today', label: 'Today' },
@@ -114,7 +114,7 @@ export default function ReportsPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-[#E6FFFD] px-6 pb-10 pt-20 md:px-10">
+    <div className="min-h-screen bg-[#E6FFFD] px-4 pb-8 pt-16 sm:px-6 sm:pb-10 sm:pt-10 lg:px-10 lg:pt-12">
       <div className="mx-auto w-full max-w-275">
         <header className="mb-6">
           <h1 className="text-2xl font-bold text-gray-800">Reports</h1>
@@ -140,19 +140,19 @@ export default function ReportsPage() {
               </button>
             ))}
             {datePreset === 'custom' && (
-              <div className="flex items-center gap-2 ml-2">
+              <div className="ml-0 flex w-full flex-col items-stretch gap-2 sm:ml-2 sm:w-auto sm:flex-row sm:items-center">
                 <input
                   type="date"
                   value={customStart}
                   onChange={(e) => setCustomStart(e.target.value)}
-                  className="h-8 px-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-[#008C83]"
+                  className="h-8 rounded-lg border border-gray-200 px-2 text-xs outline-none focus:border-[#008C83]"
                 />
-                <span className="text-xs text-gray-400">to</span>
+                <span className="hidden text-xs text-gray-400 sm:inline">to</span>
                 <input
                   type="date"
                   value={customEnd}
                   onChange={(e) => setCustomEnd(e.target.value)}
-                  className="h-8 px-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-[#008C83]"
+                  className="h-8 rounded-lg border border-gray-200 px-2 text-xs outline-none focus:border-[#008C83]"
                 />
               </div>
             )}

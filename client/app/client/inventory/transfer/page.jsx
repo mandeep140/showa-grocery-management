@@ -18,9 +18,11 @@ const Transfer = () => {
   const [productSearch, setProductSearch] = useState('')
   const [productResults, setProductResults] = useState([])
   const [showDropdown, setShowDropdown] = useState(false)
+  const [locationDropdown, setLocationDropdown] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [notes, setNotes] = useState('')
   const searchTimeout = useRef(null)
+  const locationDropdownRef = useRef(null)
 
   useEffect(() => {
     const load = async () => {
@@ -43,6 +45,15 @@ const Transfer = () => {
       } catch (err) { console.error(err) }
     }
     load()
+  }, [])
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (!locationDropdownRef.current) return
+      if (!locationDropdownRef.current.contains(event.target)) setLocationDropdown(null)
+    }
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
   }, [])
 
   const searchProducts = async (query) => {
@@ -145,95 +156,135 @@ const Transfer = () => {
     }
   }
 
-  const fromName = locations.find(l => l.id === fromLocation)?.name || '—'
-  const toName = locations.find(l => l.id === toLocation)?.name || '—'
+  const fromLabel = locations.find((l) => l.id === Number(fromLocation))
+    ? `${locations.find((l) => l.id === Number(fromLocation)).name} (${locations.find((l) => l.id === Number(fromLocation)).location_type})`
+    : 'Select location'
+
+  const toLabel = locations.find((l) => l.id === Number(toLocation))
+    ? `${locations.find((l) => l.id === Number(toLocation)).name} (${locations.find((l) => l.id === Number(toLocation)).location_type})`
+    : 'Select location'
 
   return (
-    <div className="w-full min-h-screen px-15 py-20 bg-[#E6FFFD]">
-      <Link href="/client/inventory" className="flex items-center mb-8 hover:text-gray-500 duration-200">
+    <div className="w-full min-h-screen bg-[#E6FFFD] px-4 pb-8 pt-16 sm:px-8 sm:pb-10 sm:pt-10 lg:px-12 lg:py-20 xl:px-15">
+      <Link href="/client/inventory" className="mb-6 flex items-center text-sm duration-200 hover:text-gray-500 sm:mb-8 sm:text-base">
         <IoMdArrowBack /> &nbsp; Back to inventory
       </Link>
-      <h1 className="text-3xl font-bold mb-2">Stock Transfer</h1>
-      <p className="text-sm text-gray-400 mb-10">Move stock between storage and shop floor</p>
+      <h1 className="mb-2 text-2xl font-bold sm:text-3xl">Stock Transfer</h1>
+      <p className="mb-6 text-sm text-gray-400 sm:mb-10">Move stock between storage and shop floor</p>
 
       {/* Location cards */}
-      <div className="w-[80%] mx-auto flex gap-4 items-center mb-10">
-        <div className="w-[45%] px-5 py-5 bg-white rounded-lg border border-gray-100">
-          <div className="flex gap-3 items-center mb-3">
-            <span className="p-3.5 bg-[#E3F2FD] rounded-lg text-lg text-[#2196F3]"><FaStore /></span>
+      <div ref={locationDropdownRef} className="mx-auto mb-6 grid w-full max-w-5xl grid-cols-1 items-center gap-3 sm:mb-10 sm:grid-cols-[1fr_auto_1fr] sm:gap-4">
+        <div className="w-full rounded-lg border border-gray-100 bg-white px-4 py-4 sm:px-5 sm:py-5">
+          <div className="mb-3 flex items-center gap-3">
+            <span className="rounded-lg bg-[#E3F2FD] p-3.5 text-lg text-[#2196F3]"><FaStore /></span>
             <span>
-              <p className="font-semibold text-lg">From</p>
+              <p className="text-lg font-semibold">From</p>
               <p className="text-sm text-gray-400">Source location</p>
             </span>
           </div>
-          <select
-            value={fromLocation}
-            onChange={(e) => { setFromLocation(Number(e.target.value)); setItems([]) }}
-            className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:border-[#008C83]"
-          >
-            <option value="">Select location</option>
-            {locations.map(l => (
-              <option key={l.id} value={l.id}>{l.name} ({l.location_type})</option>
-            ))}
-          </select>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setLocationDropdown((prev) => (prev === 'from' ? null : 'from'))}
+              className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-sm"
+            >
+              <span>{fromLabel}</span>
+              <span className="text-xs text-gray-500">▼</span>
+            </button>
+            {locationDropdown === 'from' && (
+              <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                {locations.map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => {
+                      setFromLocation(l.id)
+                      setItems([])
+                      setLocationDropdown(null)
+                    }}
+                    className="w-full border-b border-gray-50 px-3 py-2.5 text-left text-sm hover:bg-[#E6FFFD] last:border-0"
+                  >
+                    {l.name} ({l.location_type})
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        <button type="button" onClick={swapLocations} className="p-3 bg-white border border-gray-200 rounded-full hover:bg-gray-50 duration-150 cursor-pointer">
+        <button type="button" onClick={swapLocations} className="mx-auto rounded-full border border-gray-200 bg-white p-3 duration-150 hover:bg-gray-50 cursor-pointer">
           <FaArrowRight className="text-[#008C83]" />
         </button>
 
-        <div className="w-[45%] px-5 py-5 bg-white rounded-lg border border-gray-100">
-          <div className="flex gap-3 items-center mb-3">
-            <span className="p-3.5 bg-[#E8F5E9] rounded-lg text-lg text-[#4CAF50]"><FaBox /></span>
+        <div className="w-full rounded-lg border border-gray-100 bg-white px-4 py-4 sm:px-5 sm:py-5">
+          <div className="mb-3 flex items-center gap-3">
+            <span className="rounded-lg bg-[#E8F5E9] p-3.5 text-lg text-[#4CAF50]"><FaBox /></span>
             <span>
-              <p className="font-semibold text-lg">To</p>
+              <p className="text-lg font-semibold">To</p>
               <p className="text-sm text-gray-400">Destination location</p>
             </span>
           </div>
-          <select
-            value={toLocation}
-            onChange={(e) => setToLocation(Number(e.target.value))}
-            className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:border-[#008C83]"
-          >
-            <option value="">Select location</option>
-            {locations.map(l => (
-              <option key={l.id} value={l.id}>{l.name} ({l.location_type})</option>
-            ))}
-          </select>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setLocationDropdown((prev) => (prev === 'to' ? null : 'to'))}
+              className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-sm"
+            >
+              <span>{toLabel}</span>
+              <span className="text-xs text-gray-500">▼</span>
+            </button>
+            {locationDropdown === 'to' && (
+              <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                {locations.map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => {
+                      setToLocation(l.id)
+                      setLocationDropdown(null)
+                    }}
+                    className="w-full border-b border-gray-50 px-3 py-2.5 text-left text-sm hover:bg-[#E6FFFD] last:border-0"
+                  >
+                    {l.name} ({l.location_type})
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Transfer Details */}
-      <div className="w-[80%] mx-auto flex flex-col gap-5 p-6 bg-white rounded-lg mb-10">
+      <div className="mx-auto mb-10 flex w-full max-w-5xl flex-col gap-5 rounded-lg bg-white p-4 sm:p-6">
         <h2 className="text-lg font-semibold">Transfer Items</h2>
 
         {/* Product search */}
         <div className="relative">
-          <label className="block text-sm font-medium text-gray-600 mb-1.5">Search product to add</label>
-          <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 h-11">
+          <label className="mb-1.5 block text-sm font-medium text-gray-600">Search product to add</label>
+          <div className="flex h-11 items-center gap-2 rounded-lg border border-gray-200 px-3">
             <HiMiniMagnifyingGlass className="h-4 w-4 text-gray-400" />
             <input
               type="text"
               value={productSearch}
               onChange={(e) => handleProductSearch(e.target.value)}
               onFocus={() => productSearch && setShowDropdown(true)}
-              onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+              onBlur={() => setTimeout(() => setShowDropdown(false), 300)}
               placeholder="Type product name or code..."
               className="flex-1 bg-transparent text-sm outline-none"
               disabled={!fromLocation}
             />
           </div>
           {showDropdown && productResults.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+            <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
               {productResults.map(p => (
                 <button
                   key={p.id}
                   type="button"
-                  onMouseDown={() => selectProduct(p)}
-                  className="w-full text-left px-3 py-2.5 hover:bg-[#E6FFFD] text-sm border-b border-gray-50 last:border-0 flex justify-between cursor-pointer"
+                  onPointerDown={(e) => { e.preventDefault(); selectProduct(p) }}
+                  className="flex w-full cursor-pointer justify-between border-b border-gray-50 px-3 py-2.5 text-left text-sm hover:bg-[#E6FFFD] last:border-0"
                 >
                   <span className="font-medium text-gray-700">{p.name}</span>
-                  <span className="text-gray-400 text-xs">Stock: {p.total_stock} | {p.product_code}</span>
+                  <span className="text-xs text-gray-400">Stock: {p.total_stock} | {p.product_code}</span>
                 </button>
               ))}
             </div>
@@ -242,15 +293,15 @@ const Transfer = () => {
 
         {/* Items table */}
         {items.length > 0 && (
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-500 text-xs">
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="bg-gray-50 text-xs text-gray-500">
                 <tr>
-                  <th className="text-left px-4 py-3 font-medium">Product</th>
-                  <th className="text-left px-4 py-3 font-medium">Batch</th>
-                  <th className="text-left px-4 py-3 font-medium">Available</th>
-                  <th className="text-left px-4 py-3 font-medium">Transfer Qty</th>
-                  <th className="px-4 py-3 w-10"></th>
+                  <th className="px-4 py-3 text-left font-medium">Product</th>
+                  <th className="px-4 py-3 text-left font-medium">Batch</th>
+                  <th className="px-4 py-3 text-left font-medium">Available</th>
+                  <th className="px-4 py-3 text-left font-medium">Transfer Qty</th>
+                  <th className="w-10 px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody>
@@ -265,7 +316,7 @@ const Transfer = () => {
                         <select
                           value={item.from_batch_id}
                           onChange={(e) => updateItemBatch(idx, e.target.value)}
-                          className="text-sm border border-gray-200 rounded px-2 py-1 bg-gray-50"
+                          className="rounded border border-gray-200 bg-gray-50 px-2 py-1 text-sm"
                         >
                           {item.batches.map(b => (
                             <option key={b.id} value={b.id}>{b.batch_no || `B-${b.id}`} (Qty: {b.quantity_remaining})</option>
@@ -283,11 +334,11 @@ const Transfer = () => {
                         max={item.available}
                         value={item.quantity}
                         onChange={(e) => updateItemQuantity(idx, e.target.value)}
-                        className="w-20 text-sm border border-gray-200 rounded px-2 py-1.5 bg-gray-50 focus:outline-none focus:border-[#008C83]"
+                        className="w-20 rounded border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm focus:border-[#008C83] focus:outline-none"
                       />
                     </td>
                     <td className="px-4 py-3">
-                      <button type="button" onClick={() => removeItem(idx)} className="p-1 text-gray-400 hover:text-red-500 cursor-pointer">
+                      <button type="button" onClick={() => removeItem(idx)} className="cursor-pointer p-1 text-gray-400 hover:text-red-500">
                         <FiTrash2 className="h-4 w-4" />
                       </button>
                     </td>
@@ -299,32 +350,32 @@ const Transfer = () => {
         )}
 
         {items.length === 0 && (
-          <div className="py-8 text-center text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">
+          <div className="rounded-lg border border-dashed border-gray-200 py-8 text-center text-sm text-gray-400">
             Search and add products to transfer
           </div>
         )}
 
         <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1.5">Notes (optional)</label>
+          <label className="mb-1.5 block text-sm font-medium text-gray-600">Notes (optional)</label>
           <textarea
             rows={2}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-lg outline-none resize-none focus:border-[#008C83] duration-200"
+            className="w-full resize-none rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm outline-none duration-200 focus:border-[#008C83]"
             placeholder="Any additional notes..."
           />
         </div>
 
-        <div className="w-full h-px bg-gray-200 mt-1"></div>
-        <div className="flex items-center justify-between mt-1">
-          <Link href="/client/inventory" className="px-6 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-100 duration-150 text-sm">
+        <div className="mt-1 h-px w-full bg-gray-200"></div>
+        <div className="mt-1 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Link href="/client/inventory" className="w-full rounded-lg border border-gray-300 px-6 py-2.5 text-center text-sm duration-150 hover:bg-gray-100 sm:w-auto">
             Cancel
           </Link>
           <button
             type="button"
             onClick={handleSubmit}
             disabled={submitting || items.length === 0}
-            className="px-6 py-2.5 bg-[#008C83] text-white rounded-lg hover:bg-[#007571] duration-200 text-sm font-medium disabled:opacity-50 cursor-pointer"
+            className="w-full cursor-pointer rounded-lg bg-[#008C83] px-6 py-2.5 text-sm font-medium text-white duration-200 hover:bg-[#007571] disabled:opacity-50 sm:w-auto"
           >
             {submitting ? 'Transferring...' : `Confirm Transfer (${items.length} item${items.length !== 1 ? 's' : ''})`}
           </button>
@@ -335,3 +386,4 @@ const Transfer = () => {
 }
 
 export default Transfer
+

@@ -229,17 +229,17 @@ const Settings = () => {
     }
 
     return (
-        <div className='w-full min-h-screen px-15 py-30 bg-[#E6FFFD]'>
-            <div className='w-full flex items-center justify-between mb-10'>
-                <h2 className='font-semibold text-4xl'>Settings</h2>
+        <div className='w-full min-h-screen bg-[#E6FFFD] px-4 pb-8 pt-16 sm:px-8 sm:pb-10 sm:pt-10 lg:px-12 lg:py-20 xl:px-15 xl:py-30'>
+            <div className='w-full flex items-center justify-between mb-6 lg:mb-10'>
+                <h2 className='font-semibold text-3xl sm:text-4xl'>Settings</h2>
             </div>
 
-            <div className='flex gap-3 mb-6'>
+            <div className='mb-6 flex flex-wrap gap-2 sm:gap-3'>
                 {tabs.map(tab => (
                     <button
                         key={tab.id}
                         onClick={() => handleTabChange(tab.id)}
-                        className={`px-6 py-3 rounded-lg font-medium flex items-center gap-2 duration-200 cursor-pointer ${activeTab === tab.id ? 'bg-[#008C83] text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                        className={`rounded-lg px-4 py-2.5 text-sm font-medium flex items-center gap-2 duration-200 cursor-pointer sm:px-6 sm:py-3 sm:text-base ${activeTab === tab.id ? 'bg-[#008C83] text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
                     >
                         <span className='text-lg'>{tab.icon}</span>
                         {tab.label}
@@ -247,9 +247,9 @@ const Settings = () => {
                 ))}
             </div>
 
-            <div className='bg-white rounded-xl p-8'>
+            <div className='bg-white rounded-xl p-4 sm:p-6 lg:p-8'>
                 {activeTab === 'printer' ? (
-                    <div className='max-w-2xl'>
+                    <div className='w-full max-w-2xl'>
                         <h3 className='text-xl font-semibold mb-1'>Thermal Printer</h3>
                         <p className='text-sm text-gray-400 mb-6'>Connect a Bluetooth or WiFi thermal printer for receipt printing</p>
 
@@ -328,7 +328,7 @@ const Settings = () => {
                                             <h5 className='font-semibold text-sm text-gray-700'>WiFi Printer</h5>
                                         </div>
                                         <p className='text-xs text-gray-400 mb-3'>Connect to a WiFi/LAN thermal printer using IP address (same network)</p>
-                                        <div className='flex gap-2 mb-3'>
+                                        <div className='mb-3 flex flex-col gap-2 sm:flex-row'>
                                             <input
                                                 type='text'
                                                 value={wifiIP}
@@ -341,7 +341,7 @@ const Settings = () => {
                                                 value={wifiPort}
                                                 onChange={(e) => setWifiPort(e.target.value)}
                                                 placeholder='9100'
-                                                className='w-20 px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:border-[#008C83]'
+                                                className='w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:border-[#008C83] sm:w-24'
                                             />
                                         </div>
                                         <button
@@ -364,7 +364,7 @@ const Settings = () => {
                             <>
                                 <div className='bg-gray-50 border border-gray-200 rounded-xl p-6 mb-6'>
                                     <h4 className='font-semibold text-base mb-4'>Paper Size</h4>
-                                    <div className='flex gap-3'>
+                                    <div className='flex flex-col gap-3 sm:flex-row'>
                                         <button
                                             onClick={() => updatePrinterSetting('paperWidth', 32)}
                                             className={`flex-1 py-3 rounded-lg text-sm font-medium border duration-150 cursor-pointer ${
@@ -428,7 +428,7 @@ const Settings = () => {
 
                                 <div className='bg-gray-50 border border-gray-200 rounded-xl p-6 mb-6'>
                                     <h4 className='font-semibold text-base mb-4'>Receipt Footer</h4>
-                                    <p className='text-xs text-gray-400 mb-3'>Custom message at the bottom of the receipt (before "Powered by showa.online")</p>
+                                    <p className='text-xs text-gray-400 mb-3'>Custom message at the bottom of the receipt (before &quot;Powered by showa.online&quot;)</p>
                                     <div className='space-y-3'>
                                         <div>
                                             <label className='block text-sm font-medium text-gray-600 mb-1'>Footer Line 1</label>
@@ -516,23 +516,23 @@ const Settings = () => {
                         </div>
 
                         <p className='text-xs text-gray-400 text-center max-w-xs'>
-                            Make sure both devices are on the same Wi-Fi network. The app uses HTTPS so your browser may show a certificate warning — just tap "Advanced → Proceed".
+                            Make sure both devices are on the same Wi-Fi network. The app uses HTTPS so your browser may show a certificate warning — just tap &quot;Advanced -&gt; Proceed&quot;.
                         </p>
                     </div>
                 ) : (
                 <>
-                <div className='flex items-center justify-between mb-6'>
+                <div className='mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
                     <h3 className='text-xl font-semibold capitalize'>{activeTab}</h3>
                     <button
                         onClick={openAddForm}
-                        className='bg-[#008C83] hover:bg-[#00675B] text-white px-5 py-2 rounded-lg duration-200 cursor-pointer flex items-center gap-2'
+                        className='bg-[#008C83] hover:bg-[#00675B] text-white px-5 py-2 rounded-lg duration-200 cursor-pointer flex items-center justify-center gap-2 w-full sm:w-auto'
                     >
                         <IoMdAdd /> Add {activeTab === 'categories' ? 'Category' : activeTab === 'brands' ? 'Brand' : 'Location'}
                     </button>
                 </div>
 
                 {showForm && (
-                    <div className='bg-[#F0FFFE] border border-[#008C83]/20 rounded-xl p-6 mb-6'>
+                    <div className='bg-[#F0FFFE] border border-[#008C83]/20 rounded-xl p-4 sm:p-6 mb-6'>
                         <div className='flex items-center justify-between mb-4'>
                             <h4 className='font-semibold text-lg'>
                                 {editingId ? 'Edit' : 'Add'} {activeTab === 'categories' ? 'Category' : activeTab === 'brands' ? 'Brand' : 'Location'}
@@ -590,9 +590,9 @@ const Settings = () => {
                                 </div>
                             )}
                         </div>
-                        <div className='flex justify-end mt-5 gap-3'>
+                        <div className='mt-5 grid grid-cols-2 gap-2 sm:flex sm:justify-end sm:gap-3'>
                             <button onClick={resetForm} className='px-5 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 duration-200 cursor-pointer'>Cancel</button>
-                            <button onClick={handleSave} className='px-5 py-2 rounded-lg bg-[#008C83] hover:bg-[#00675B] text-white duration-200 cursor-pointer flex items-center gap-2'>
+                            <button onClick={handleSave} className='px-5 py-2 rounded-lg bg-[#008C83] hover:bg-[#00675B] text-white duration-200 cursor-pointer flex items-center justify-center gap-2'>
                                 <FiCheck /> {editingId ? 'Update' : 'Save'}
                             </button>
                         </div>
@@ -602,52 +602,54 @@ const Settings = () => {
                 {loading ? (
                     <div className='py-20 text-center text-gray-400'>Loading...</div>
                 ) : (
-                    <table className='w-full'>
-                        <thead className='bg-[#F5F5F5]'>
-                            <tr>
-                                <th className='text-left p-4 font-semibold w-12'>#</th>
-                                <th className='text-left p-4 font-semibold'>Name</th>
-                                {activeTab === 'locations' ? (
-                                    <>
-                                        <th className='text-left p-4 font-semibold'>Type</th>
-                                        <th className='text-left p-4 font-semibold'>Address</th>
-                                    </>
-                                ) : (
-                                    <th className='text-left p-4 font-semibold'>Description</th>
-                                )}
-                                <th className='text-left p-4 font-semibold'>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {getCurrentData().map((item, idx) => (
-                                <tr key={item.id} className='border-t hover:bg-gray-50 duration-200'>
-                                    <td className='p-4 text-sm text-gray-400'>{idx + 1}</td>
-                                    <td className='p-4 text-sm font-medium'>{item.name}</td>
+                    <div className='w-full overflow-x-auto'>
+                        <table className='w-full min-w-[760px]'>
+                            <thead className='bg-[#F5F5F5]'>
+                                <tr>
+                                    <th className='text-left p-4 font-semibold w-12'>#</th>
+                                    <th className='text-left p-4 font-semibold'>Name</th>
                                     {activeTab === 'locations' ? (
                                         <>
-                                            <td className='p-4 text-sm'>
-                                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${item.location_type === 'shop' ? 'bg-blue-100 text-blue-700' : item.location_type === 'storage' ? 'bg-orange-100 text-orange-700' : 'bg-purple-100 text-purple-700'}`}>
-                                                    {item.location_type}
-                                                </span>
-                                            </td>
-                                            <td className='p-4 text-sm text-gray-500'>{item.address || '—'}</td>
+                                            <th className='text-left p-4 font-semibold'>Type</th>
+                                            <th className='text-left p-4 font-semibold'>Address</th>
                                         </>
                                     ) : (
-                                        <td className='p-4 text-sm text-gray-500'>{item.description || '—'}</td>
+                                        <th className='text-left p-4 font-semibold'>Description</th>
                                     )}
-                                    <td className='p-4 text-sm'>
-                                        <span className='flex items-center gap-4'>
-                                            <button onClick={() => openEditForm(item)} className='text-lg text-gray-500 hover:text-[#008C83] cursor-pointer duration-200'><GoPencil /></button>
-                                            <button onClick={() => handleDelete(item.id, item.name)} className='text-lg text-red-400 hover:text-red-600 cursor-pointer duration-200'><FiTrash2 /></button>
-                                        </span>
-                                    </td>
+                                    <th className='text-left p-4 font-semibold'>Actions</th>
                                 </tr>
-                            ))}
-                            {getCurrentData().length === 0 && (
-                                <tr><td colSpan={activeTab === 'locations' ? 5 : 4} className='p-10 text-center text-gray-400'>No {activeTab} found. Add one to get started.</td></tr>
-                            )}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {getCurrentData().map((item, idx) => (
+                                    <tr key={item.id} className='border-t hover:bg-gray-50 duration-200'>
+                                        <td className='p-4 text-sm text-gray-400'>{idx + 1}</td>
+                                        <td className='p-4 text-sm font-medium'>{item.name}</td>
+                                        {activeTab === 'locations' ? (
+                                            <>
+                                                <td className='p-4 text-sm'>
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${item.location_type === 'shop' ? 'bg-blue-100 text-blue-700' : item.location_type === 'storage' ? 'bg-orange-100 text-orange-700' : 'bg-purple-100 text-purple-700'}`}>
+                                                        {item.location_type}
+                                                    </span>
+                                                </td>
+                                                <td className='p-4 text-sm text-gray-500'>{item.address || '-'}</td>
+                                            </>
+                                        ) : (
+                                            <td className='p-4 text-sm text-gray-500'>{item.description || '-'}</td>
+                                        )}
+                                        <td className='p-4 text-sm'>
+                                            <div className='flex items-center gap-4'>
+                                                <button onClick={() => openEditForm(item)} className='text-lg text-gray-500 hover:text-[#008C83] cursor-pointer duration-200'><GoPencil /></button>
+                                                <button onClick={() => handleDelete(item.id, item.name)} className='text-lg text-red-400 hover:text-red-600 cursor-pointer duration-200'><FiTrash2 /></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {getCurrentData().length === 0 && (
+                                    <tr><td colSpan={activeTab === 'locations' ? 5 : 4} className='p-10 text-center text-gray-400'>No {activeTab} found. Add one to get started.</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
                 </>
                 )}
@@ -657,3 +659,6 @@ const Settings = () => {
 }
 
 export default Settings
+
+
+

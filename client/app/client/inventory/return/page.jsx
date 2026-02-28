@@ -17,6 +17,7 @@ const Return = () => {
 
   const [locations, setLocations] = useState([])
   const [selectedLocation, setSelectedLocation] = useState('')
+  const [locationDropdown, setLocationDropdown] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [reason, setReason] = useState('')
 
@@ -46,6 +47,7 @@ const Return = () => {
   const [batches, setBatches] = useState([])
   const productSearchTimeout = useRef(null)
   const sellerSearchTimeout = useRef(null)
+  const locationDropdownRef = useRef(null)
 
   useEffect(() => {
     const loadLocations = async () => {
@@ -60,6 +62,16 @@ const Return = () => {
     loadLocations()
   }, [])
 
+  useEffect(() => {
+    const handleOutside = (event) => {
+      if (!locationDropdownRef.current) return
+      if (!locationDropdownRef.current.contains(event.target)) setLocationDropdown(null)
+    }
+    document.addEventListener('mousedown', handleOutside)
+    return () => document.removeEventListener('mousedown', handleOutside)
+  }, [])
+
+  // --- Customer Return: Product Search ---
   const searchCProducts = async (query) => {
     if (!query.trim()) return setCProductResults([])
     try {
@@ -321,34 +333,35 @@ const Return = () => {
   // --- Total ---
   const customerTotal = returnItems.reduce((s, i) => s + (i.quantity * i.selling_price), 0)
   const sellerTotal = sellerItems.reduce((s, i) => s + (i.quantity * i.buying_rate), 0)
+  const selectedLocationLabel = locations.find((l) => l.id === Number(selectedLocation))?.name || 'Select location'
 
   return (
-    <div className="w-full min-h-screen px-15 py-20 bg-[#E6FFFD]">
-      <Link href="/client/inventory" className="flex items-center mb-8 hover:text-gray-500 duration-200">
+    <div className="w-full min-h-screen bg-[#E6FFFD] px-4 pb-8 pt-16 sm:px-8 sm:pb-10 sm:pt-10 lg:px-12 lg:py-20 xl:px-15">
+      <Link href="/client/inventory" className="mb-6 flex items-center text-sm duration-200 hover:text-gray-500 sm:mb-8 sm:text-base">
         <IoMdArrowBack /> &nbsp; Back to inventory
       </Link>
-      <h1 className="text-3xl font-bold mb-2">Returns Management</h1>
-      <p className="text-sm text-gray-400 mb-10">Process customer and supplier returns with inventory impact</p>
+      <h1 className="mb-2 text-2xl font-bold sm:text-3xl">Returns Management</h1>
+      <p className="mb-6 text-sm text-gray-400 sm:mb-10">Process customer and supplier returns with inventory impact</p>
 
       {/* Return Type Toggle */}
-      <div className="w-[80%] mx-auto flex gap-6 items-center mb-10">
+      <div className="mx-auto mb-6 grid w-full max-w-5xl grid-cols-1 items-center gap-3 sm:mb-10 sm:grid-cols-2 sm:gap-6">
         <div
-          className={`flex items-center justify-center w-1/2 border-2 ${returnType === 'customer' ? 'border-[#008C83] bg-white' : 'border-gray-300 bg-white'} rounded-lg py-4 gap-4 cursor-pointer hover:border-[#00A69B] duration-150`}
+          className={`flex w-full cursor-pointer items-center justify-start gap-3 rounded-lg border-2 px-4 py-3 duration-150 hover:border-[#00A69B] sm:justify-center sm:gap-4 sm:px-0 sm:py-4 ${returnType === 'customer' ? 'border-[#008C83] bg-white' : 'border-gray-300 bg-white'}`}
           onClick={() => setReturnType('customer')}
         >
           <VscDebugRestart className={`text-4xl ${returnType === 'customer' ? 'text-[#008C83]' : 'text-gray-400'}`} />
           <div>
-            <p className="font-semibold text-lg">Customer Returns</p>
+            <p className="text-base font-semibold sm:text-lg">Customer Returns</p>
             <p className="text-sm text-gray-400">Stock increases back into inventory</p>
           </div>
         </div>
         <div
-          className={`flex items-center justify-center w-1/2 border-2 ${returnType === 'seller' ? 'border-[#008C83] bg-white' : 'border-gray-300 bg-white'} rounded-lg py-4 gap-4 cursor-pointer hover:border-[#00A69B] duration-150`}
+          className={`flex w-full cursor-pointer items-center justify-start gap-3 rounded-lg border-2 px-4 py-3 duration-150 hover:border-[#00A69B] sm:justify-center sm:gap-4 sm:px-0 sm:py-4 ${returnType === 'seller' ? 'border-[#008C83] bg-white' : 'border-gray-300 bg-white'}`}
           onClick={() => setReturnType('seller')}
         >
           <FaBox className={`text-4xl ${returnType === 'seller' ? 'text-[#008C83]' : 'text-gray-400'}`} />
           <div>
-            <p className="font-semibold text-lg">Supplier Returns</p>
+            <p className="text-base font-semibold sm:text-lg">Supplier Returns</p>
             <p className="text-sm text-gray-400">Stock decreases, returned to supplier</p>
           </div>
         </div>
@@ -356,7 +369,7 @@ const Return = () => {
 
       {/* ============ CUSTOMER RETURN ============ */}
       {returnType === 'customer' && (
-        <div className="w-[80%] mx-auto rounded-lg bg-white flex flex-col gap-6 px-7 py-6">
+        <div ref={locationDropdownRef} className="mx-auto flex w-full max-w-5xl flex-col gap-5 rounded-lg bg-white p-4 sm:gap-6 sm:px-7 sm:py-6">
           <h2 className="font-semibold flex items-center gap-2">
             <FaFileAlt className="text-[#008C83] text-xl" /> Customer Return Details
           </h2>
@@ -365,22 +378,40 @@ const Return = () => {
           {locations.length > 1 && (
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-1.5">Return stock to location *</label>
-              <select
-                value={selectedLocation}
-                onChange={(e) => setSelectedLocation(Number(e.target.value))}
-                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:border-[#008C83]"
-              >
-                {locations.map(l => (
-                  <option key={l.id} value={l.id}>{l.name}</option>
-                ))}
-              </select>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setLocationDropdown((prev) => (prev === 'customer' ? null : 'customer'))}
+                  className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-sm"
+                >
+                  <span>{selectedLocationLabel}</span>
+                  <span className="text-xs text-gray-500">▼</span>
+                </button>
+                {locationDropdown === 'customer' && (
+                  <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                    {locations.map((l) => (
+                      <button
+                        key={l.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedLocation(l.id)
+                          setLocationDropdown(null)
+                        }}
+                        className="w-full border-b border-gray-50 px-3 py-2.5 text-left text-sm hover:bg-[#E6FFFD] last:border-0"
+                      >
+                        {l.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
           {/* Product search + barcode scan */}
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1.5">Add Product</label>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <div className="relative flex-1">
                 <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 h-11">
                   <HiMiniMagnifyingGlass className="h-4 w-4 text-gray-400" />
@@ -389,7 +420,7 @@ const Return = () => {
                     value={cProductSearch}
                     onChange={(e) => handleCProductSearch(e.target.value)}
                     onFocus={() => cProductSearch && setCShowProductDropdown(true)}
-                    onBlur={() => setTimeout(() => setCShowProductDropdown(false), 200)}
+                    onBlur={() => setTimeout(() => setCShowProductDropdown(false), 300)}
                     placeholder="Search product by name, code, or barcode..."
                     className="flex-1 bg-transparent text-sm outline-none"
                   />
@@ -400,7 +431,7 @@ const Return = () => {
                       <button
                         key={p.id}
                         type="button"
-                        onMouseDown={() => addReturnItem(p)}
+                        onPointerDown={(e) => { e.preventDefault(); addReturnItem(p) }}
                         className="w-full text-left px-3 py-2.5 hover:bg-[#E6FFFD] text-sm border-b border-gray-50 last:border-0 flex justify-between cursor-pointer"
                       >
                         <span className="font-medium text-gray-700">{p.name}</span>
@@ -413,7 +444,7 @@ const Return = () => {
               <button
                 type="button"
                 onClick={() => setShowScanner(true)}
-                className="px-4 h-11 border border-gray-200 rounded-lg hover:bg-[#E6FFFD] hover:border-[#008C83] duration-150 flex items-center gap-2 text-sm text-gray-600 cursor-pointer"
+                className="flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 text-sm text-gray-600 duration-150 hover:border-[#008C83] hover:bg-[#E6FFFD] sm:w-auto"
               >
                 <MdQrCodeScanner className="text-lg text-[#008C83]" /> Scan
               </button>
@@ -424,8 +455,8 @@ const Return = () => {
           {returnItems.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-2">Items to Return</label>
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="w-full min-w-[820px] text-sm">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="text-left px-4 py-2.5 font-medium text-gray-500">Product</th>
@@ -495,7 +526,7 @@ const Return = () => {
                       value={customerSearch}
                       onChange={(e) => handleCustomerSearch(e.target.value)}
                       onFocus={() => customerSearch && setShowCustomerDropdown(true)}
-                      onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
+                      onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 300)}
                       placeholder="Search customer by name or phone..."
                       className="flex-1 bg-transparent text-sm outline-none"
                     />
@@ -506,7 +537,7 @@ const Return = () => {
                         <button
                           key={c.id}
                           type="button"
-                          onMouseDown={() => selectCustomer(c)}
+                          onPointerDown={(e) => { e.preventDefault(); selectCustomer(c) }}
                           className="w-full text-left px-3 py-2.5 hover:bg-[#E6FFFD] text-sm border-b border-gray-50 last:border-0 flex justify-between cursor-pointer"
                         >
                           <span className="font-medium text-gray-700">{c.name}</span>
@@ -537,7 +568,7 @@ const Return = () => {
 
                   {/* Refund method */}
                   <label className="block text-xs font-medium text-gray-500 mb-2">Where should the refund go?</label>
-                  <div className="flex gap-3">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
                     <div
                       onClick={() => setRefundMethod('cash')}
                       className={`flex-1 py-2.5 text-center border rounded-lg cursor-pointer duration-150 text-sm font-medium ${
@@ -584,7 +615,7 @@ const Return = () => {
 
           {/* Total */}
           {customerTotal > 0 && (
-            <div className="flex items-center justify-between p-4 bg-[#E6FFFD] rounded-lg">
+            <div className="flex flex-col items-start gap-2 rounded-lg bg-[#E6FFFD] p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <span className="text-sm font-medium text-gray-600">Total refund amount</span>
                 {!selectedCustomer && <span className="text-xs text-gray-400 ml-2">(Cash)</span>}
@@ -597,15 +628,15 @@ const Return = () => {
           )}
 
           <div className="w-full h-px bg-gray-200"></div>
-          <div className="flex items-center justify-between">
-            <Link href="/client/inventory" className="px-6 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-100 duration-150 text-sm">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Link href="/client/inventory" className="w-full rounded-lg border border-gray-300 px-6 py-2.5 text-center text-sm duration-150 hover:bg-gray-100 sm:w-auto">
               Cancel
             </Link>
             <button
               type="button"
               onClick={handleCustomerReturn}
               disabled={submitting || returnItems.length === 0}
-              className="px-6 py-2.5 bg-[#008C83] text-white rounded-lg hover:bg-[#007571] duration-200 text-sm font-medium disabled:opacity-50 cursor-pointer"
+              className="w-full cursor-pointer rounded-lg bg-[#008C83] px-6 py-2.5 text-sm font-medium text-white duration-200 hover:bg-[#007571] disabled:opacity-50 sm:w-auto"
             >
               {submitting ? 'Processing...' : `Process Return (${returnItems.length} items)`}
             </button>
@@ -618,7 +649,7 @@ const Return = () => {
 
       {/* ============ SELLER RETURN ============ */}
       {returnType === 'seller' && (
-        <div className="w-[80%] mx-auto rounded-lg bg-white flex flex-col gap-6 px-7 py-6">
+        <div ref={locationDropdownRef} className="mx-auto flex w-full max-w-5xl flex-col gap-5 rounded-lg bg-white p-4 sm:gap-6 sm:px-7 sm:py-6">
           <h2 className="font-semibold flex items-center gap-2">
             <FaFileAlt className="text-[#008C83] text-xl" /> Supplier Return Details
           </h2>
@@ -633,7 +664,7 @@ const Return = () => {
                 value={sellerSearch}
                 onChange={(e) => handleSellerSearch(e.target.value)}
                 onFocus={() => sellerSearch && setShowSellerDropdown(true)}
-                onBlur={() => setTimeout(() => setShowSellerDropdown(false), 200)}
+                onBlur={() => setTimeout(() => setShowSellerDropdown(false), 300)}
                 placeholder="Search supplier by name or company..."
                 className="flex-1 bg-transparent text-sm outline-none"
               />
@@ -644,7 +675,7 @@ const Return = () => {
                   <button
                     key={s.id}
                     type="button"
-                    onMouseDown={() => selectSeller(s)}
+                    onPointerDown={(e) => { e.preventDefault(); selectSeller(s) }}
                     className="w-full text-left px-3 py-2.5 hover:bg-[#E6FFFD] text-sm border-b border-gray-50 last:border-0 flex justify-between cursor-pointer"
                   >
                     <span className="font-medium text-gray-700">{s.name}</span>
@@ -659,15 +690,36 @@ const Return = () => {
           {locations.length > 1 && (
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-1.5">Return stock from location *</label>
-              <select
-                value={selectedLocation}
-                onChange={(e) => { setSelectedLocation(Number(e.target.value)); setSellerItems([]); setSelectedProduct(null); setProductSearch('') }}
-                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:border-[#008C83]"
-              >
-                {locations.map(l => (
-                  <option key={l.id} value={l.id}>{l.name}</option>
-                ))}
-              </select>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setLocationDropdown((prev) => (prev === 'seller' ? null : 'seller'))}
+                  className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-sm"
+                >
+                  <span>{selectedLocationLabel}</span>
+                  <span className="text-xs text-gray-500">▼</span>
+                </button>
+                {locationDropdown === 'seller' && (
+                  <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                    {locations.map((l) => (
+                      <button
+                        key={l.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedLocation(l.id)
+                          setSellerItems([])
+                          setSelectedProduct(null)
+                          setProductSearch('')
+                          setLocationDropdown(null)
+                        }}
+                        className="w-full border-b border-gray-50 px-3 py-2.5 text-left text-sm hover:bg-[#E6FFFD] last:border-0"
+                      >
+                        {l.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -681,7 +733,7 @@ const Return = () => {
                 value={productSearch}
                 onChange={(e) => handleProductSearch(e.target.value)}
                 onFocus={() => productSearch && setShowProductDropdown(true)}
-                onBlur={() => setTimeout(() => setShowProductDropdown(false), 200)}
+                onBlur={() => setTimeout(() => setShowProductDropdown(false), 300)}
                 placeholder="Search product by name or code..."
                 className="flex-1 bg-transparent text-sm outline-none"
               />
@@ -692,7 +744,7 @@ const Return = () => {
                   <button
                     key={p.id}
                     type="button"
-                    onMouseDown={() => selectProduct(p)}
+                    onPointerDown={(e) => { e.preventDefault(); selectProduct(p) }}
                     className="w-full text-left px-3 py-2.5 hover:bg-[#E6FFFD] text-sm border-b border-gray-50 last:border-0 flex justify-between cursor-pointer"
                   >
                     <span className="font-medium text-gray-700">{p.name}</span>
@@ -732,8 +784,8 @@ const Return = () => {
           {sellerItems.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-2">Items to return</label>
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="w-full min-w-[820px] text-sm">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="text-left px-4 py-2.5 font-medium text-gray-500">Product</th>
@@ -796,22 +848,22 @@ const Return = () => {
 
           {/* Total */}
           {sellerTotal > 0 && (
-            <div className="flex items-center justify-between p-4 bg-[#E6FFFD] rounded-lg">
+            <div className="flex flex-col items-start gap-2 rounded-lg bg-[#E6FFFD] p-4 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-sm font-medium text-gray-600">Total return value</span>
               <span className="text-lg font-bold text-[#008C83]">₹{sellerTotal.toFixed(2)}</span>
             </div>
           )}
 
           <div className="w-full h-px bg-gray-200"></div>
-          <div className="flex items-center justify-between">
-            <Link href="/client/inventory" className="px-6 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-100 duration-150 text-sm">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Link href="/client/inventory" className="w-full rounded-lg border border-gray-300 px-6 py-2.5 text-center text-sm duration-150 hover:bg-gray-100 sm:w-auto">
               Cancel
             </Link>
             <button
               type="button"
               onClick={handleSellerReturn}
               disabled={submitting || sellerItems.length === 0}
-              className="px-6 py-2.5 bg-[#008C83] text-white rounded-lg hover:bg-[#007571] duration-200 text-sm font-medium disabled:opacity-50 cursor-pointer"
+              className="w-full cursor-pointer rounded-lg bg-[#008C83] px-6 py-2.5 text-sm font-medium text-white duration-200 hover:bg-[#007571] disabled:opacity-50 sm:w-auto"
             >
               {submitting ? 'Processing...' : `Process Supplier Return (${sellerItems.length} items)`}
             </button>
@@ -823,3 +875,6 @@ const Return = () => {
 }
 
 export default Return
+
+
+

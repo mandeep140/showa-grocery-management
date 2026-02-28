@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { HiMiniMagnifyingGlass, HiOutlineXMark } from 'react-icons/hi2'
 import { FiPhone, FiMapPin, FiFileText, FiPlus } from 'react-icons/fi'
-import { IoMdArrowBack } from 'react-icons/io'
 import api from '@/util/api'
 
 export default function CustomerPage() {
@@ -139,9 +138,9 @@ export default function CustomerPage() {
   const currentDueAmount = remainingBalance
 
   return (
-    <div className="min-h-screen bg-[#E6FFFD] px-6 pb-6 pt-20">
-      <div className="flex gap-5 items-start h-[calc(100vh-6rem)]">
-        <div className="w-70 shrink-0 flex flex-col bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden h-full">
+    <div className="min-h-screen bg-[#E6FFFD] px-4 pb-6 pt-16 sm:px-6 lg:px-8 lg:pt-10">
+      <div className="flex h-auto flex-col items-start gap-4 lg:h-[calc(100vh-6rem)] lg:flex-row lg:gap-5">
+        <div className="h-[42vh] w-full shrink-0 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm sm:h-[46vh] lg:h-full lg:w-70">
           <div className="p-4 border-b border-gray-100">
             <div className="flex items-center justify-between mb-1">
               <h2 className="text-base font-bold text-gray-800">Customers</h2>
@@ -208,7 +207,7 @@ export default function CustomerPage() {
         </div>
 
         {/* RIGHT: Customer detail */}
-        <div className="flex-1 h-full overflow-y-auto">
+        <div className="h-auto w-full flex-1 overflow-y-visible lg:h-full lg:overflow-y-auto">
           {!selectedCustomer ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center text-gray-400">
@@ -227,7 +226,7 @@ export default function CustomerPage() {
             <div className="space-y-5">
               {/* Header */}
               <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-                <div className="flex items-start justify-between">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="flex items-center gap-4">
                     <span className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold text-white flex-shrink-0 ${
                       ['bg-[#008C83]', 'bg-red-400', 'bg-blue-400', 'bg-purple-400', 'bg-orange-400', 'bg-pink-400'][customerDetail.id % 6]
@@ -236,7 +235,7 @@ export default function CustomerPage() {
                     </span>
                     <div>
                       <h2 className="text-lg font-bold text-gray-800">{customerDetail.name}</h2>
-                      <div className="flex items-center gap-3 mt-1 text-[13px] text-gray-400">
+                      <div className="mt-1 flex flex-wrap items-center gap-3 text-[13px] text-gray-400">
                         {customerDetail.phone && (
                           <span className="flex items-center gap-1"><FiPhone className="h-3.5 w-3.5" />{customerDetail.phone}</span>
                         )}
@@ -247,8 +246,8 @@ export default function CustomerPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
+                  <div className="flex w-full items-start justify-between gap-4 lg:w-auto lg:items-center">
+                    <div className="text-left lg:text-right">
                       <p className="text-[12px] text-gray-400">Current Outstanding Balance</p>
                       <p className={`text-2xl font-bold ${remainingBalance > 0 ? 'text-red-500' : 'text-green-500'}`}>
                         ₹{remainingBalance.toLocaleString()}
@@ -262,7 +261,7 @@ export default function CustomerPage() {
                         type="button"
                         onClick={openPaymentModal}
                         disabled={remainingBalance <= 0}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-[#008C83] text-white rounded-lg text-sm font-medium hover:bg-[#00756E] duration-150 cursor-pointer disabled:opacity-40"
+                        className="flex h-10 items-center justify-center gap-1.5 rounded-lg bg-[#008C83] px-4 text-sm font-medium text-white duration-150 hover:bg-[#00756E] cursor-pointer disabled:opacity-40"
                       >
                         Receive Payment
                       </button>
@@ -271,7 +270,7 @@ export default function CustomerPage() {
                 </div>
 
                 {/* Stats row */}
-                <div className="grid grid-cols-5 gap-4 mt-5 pt-4 border-t border-gray-100">
+                <div className="mt-5 grid grid-cols-2 gap-4 border-t border-gray-100 pt-4 sm:grid-cols-3 xl:grid-cols-5">
                   <div>
                     <p className="text-[12px] text-gray-400">Total Orders</p>
                     <p className="text-lg font-bold text-gray-800">{customerDetail.stats?.total_orders || 0}</p>
@@ -301,7 +300,7 @@ export default function CustomerPage() {
                   <h3 className="text-base font-bold text-gray-800">Transaction History</h3>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="min-w-[760px] w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-100 text-gray-400 text-[12px]">
                         <th className="text-left px-5 py-3 font-medium">Date</th>
@@ -416,7 +415,7 @@ export default function CustomerPage() {
                     <h3 className="text-base font-bold text-gray-800">Pending Debts</h3>
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="min-w-[720px] w-full text-sm">
                       <thead>
                         <tr className="border-b border-gray-100 text-gray-400 text-[12px]">
                           <th className="text-left px-5 py-3 font-medium">Invoice</th>
@@ -530,7 +529,7 @@ export default function CustomerPage() {
                 <label className="block text-sm font-medium text-gray-600 mb-1.5">Name <span className="text-red-500">*</span></label>
                 <input className="w-full h-11 rounded-lg border border-gray-200 px-3.5 text-sm outline-none focus:border-[#008C83] duration-200" value={customerForm.name} onChange={(e) => setCustomerForm(p => ({ ...p, name: e.target.value }))} placeholder="Customer name" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1.5">Phone</label>
                   <input className="w-full h-11 rounded-lg border border-gray-200 px-3.5 text-sm outline-none focus:border-[#008C83] duration-200" value={customerForm.phone} onChange={(e) => setCustomerForm(p => ({ ...p, phone: e.target.value }))} placeholder="Phone" />
