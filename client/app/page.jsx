@@ -8,7 +8,6 @@ const Home = () => {
       {/* Header */}
       <header className='flex items-center justify-between px-6 sm:px-10 py-4'>
         <div className='flex items-center gap-3'>
-          <Image src="/svg/logo.svg" alt="logo" width={50} height={30} />
           <span className='font-bold text-lg sm:text-xl text-[#014D48]'>Sahyog Home Mart</span>
         </div>
         <Link href="/login" className='text-sm font-medium text-[#014D48] hover:text-[#5CBCA9] transition-colors'>
@@ -18,9 +17,7 @@ const Home = () => {
 
       {/* Hero */}
       <main className='flex-1 flex flex-col items-center justify-center text-center px-6 sm:px-10 gap-6'>
-        <div className='p-4 rounded-2xl bg-[#5CBCA9]/10'>
-          <Image src="/svg/logo.svg" alt="logo" width={80} height={50} />
-        </div>
+          <Image src="/svg/logo.svg" className='bg-[#FFA503] rounded-lg' alt="logo" width={100} height={80} />
         <h1 className='text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#014D48] leading-tight'>
           Sahyog <span className='text-[#5CBCA9]'>Home Mart</span>
         </h1>
