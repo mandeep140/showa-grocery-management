@@ -5,7 +5,6 @@ import Image from 'next/image'
 const Home = () => {
   return (
     <div className='min-h-screen bg-[#E9FFF5] flex flex-col'>
-      {/* Header */}
       <header className='flex items-center justify-between px-6 sm:px-10 py-4'>
         <div className='flex items-center gap-3'>
           <span className='font-bold text-lg sm:text-xl text-[#014D48]'>Sahyog Home Mart</span>
@@ -15,7 +14,6 @@ const Home = () => {
         </Link>
       </header>
 
-      {/* Hero */}
       <main className='flex-1 flex flex-col items-center justify-center text-center px-6 sm:px-10 gap-6'>
           <Image src="/svg/logo.svg" className='bg-[#FFA503] rounded-lg' alt="logo" width={100} height={80} />
         <h1 className='text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#014D48] leading-tight'>
@@ -33,7 +31,6 @@ const Home = () => {
         </Link>
       </main>
 
-      {/* Footer */}
       <footer className='text-center py-4 text-xs text-gray-400'>
         Powered by showa.online
       </footer>
