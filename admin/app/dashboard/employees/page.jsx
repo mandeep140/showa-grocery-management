@@ -232,7 +232,7 @@ export default function EmployeesPage() {
                       Edit
                     </button>
                     <button
-                      onClick={() => handleDelete(user.user_id)}
+                      onClick={() => handleDelete(user.id)}
                       disabled={user.id === currentUser?.id}
                       className={`text-red-600 hover:text-red-900 ${
                         user.id === currentUser?.id ? 'opacity-50 cursor-not-allowed' : ''
