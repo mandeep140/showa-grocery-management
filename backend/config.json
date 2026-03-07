@@ -4,11 +4,11 @@
         "id": "showa-store-001",
         "address": "Patna, Bihar",
         "contact": "9876543210",
-        "lastLogin": "2026-03-02T06:37:27.667Z"
+        "lastLogin": "2026-03-07T14:18:33.155Z"
     },
     "server": {
         "url": "https://services.showa.online/api/store/verify",
-        "lastVerified": "2026-03-02T06:37:27.666Z",
+        "lastVerified": "2026-03-07T14:20:06.127Z",
         "status": "active"
     }
 }
