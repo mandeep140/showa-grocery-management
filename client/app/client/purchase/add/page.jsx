@@ -250,8 +250,8 @@ const AddPurchase = () => {
         </div>
       </div>
 
-      <div className='flex flex-col gap-6 items-start xl:flex-row'>
-        <div className='w-full xl:w-[320px] flex flex-col gap-6'>
+      <div className='flex flex-col gap-6 items-start xl:w-full xl:justify-between xl:flex-row'>
+        <div className='w-full flex flex-col gap-6'>
           <div className='bg-white rounded-xl p-4 sm:p-6 shadow-sm'>
             <h2 className='text-lg font-bold mb-6'>Order Details</h2>
             <div className='grid grid-cols-1 gap-5 sm:grid-cols-2'>
@@ -494,7 +494,7 @@ const AddPurchase = () => {
           </div>
         </div>
 
-        <div className='w-full xl:w-[320px] flex flex-col gap-6 xl:sticky xl:top-24'>
+        <div className='w-full xl:w-125 flex flex-col gap-6 xl:sticky xl:top-24'>
           <div className='bg-white rounded-xl p-4 sm:p-6 shadow-sm'>
             <h2 className='text-lg font-bold mb-5'>Order Summary</h2>
             <div className='flex flex-col gap-3 text-sm'>

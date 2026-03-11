@@ -108,13 +108,15 @@ const Return = () => {
     setShowScanner(false)
     try {
       const res = await api.get(`/api/products/barcode/${encodeURIComponent(barcode)}`)
-      if (res.data.success && res.data.products && res.data.products.length > 0) {
-        if (res.data.products.length === 1) {
-          addReturnItem(res.data.products[0])
-        } else {
+      if (res.data.success) {
+        if (res.data.product) {
+          addReturnItem(res.data.product)
+        } else if (res.data.products && res.data.products.length > 0) {
           setCProductResults(res.data.products)
           setCShowProductDropdown(true)
           setCProductSearch(barcode)
+        } else {
+          alert('No product found for this barcode')
         }
       } else {
         alert('No product found for this barcode')
