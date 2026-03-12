@@ -40,7 +40,20 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 403) {
+      const code = error.response?.data?.code;
       const message = error.response?.data?.message || 'Access denied — insufficient permissions';
+
+      if (code === 'DEMO_EXPIRED' || code === 'STORE_INACTIVE') {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('authToken');
+          delete api.defaults.headers.common['Authorization'];
+          document.cookie = 'authToken=; path=/; max-age=0';
+          const type = code === 'DEMO_EXPIRED' ? 'demo_expired' : 'store_inactive';
+          window.dispatchEvent(new CustomEvent('app-blocked', { detail: { message, type } }));
+        }
+        return Promise.reject(error);
+      }
+
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('permission-denied', { detail: { message } }));
       }

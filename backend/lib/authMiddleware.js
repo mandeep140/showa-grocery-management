@@ -78,6 +78,35 @@ async function checkStoreStatus() {
   }
 }
 
+function checkDemoExpiry() {
+  const config = readConfig();
+  if (!config?.demo?.enabled) return { expired: false };
+
+  const startDate = new Date(config.demo.startDate);
+  const durationDays = config.demo.durationDays || 30;
+  const expiryDate = new Date(startDate);
+  expiryDate.setDate(expiryDate.getDate() + durationDays);
+  const now = new Date();
+
+  if (now >= expiryDate) {
+    return {
+      expired: true,
+      expiryDate: expiryDate.toISOString(),
+      message: 'Demo period has expired. Please contact support to activate your license.'
+    };
+  }
+
+  const remainingMs = expiryDate - now;
+  const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
+  return {
+    expired: false,
+    expiryDate: expiryDate.toISOString(),
+    remainingDays,
+    startDate: config.demo.startDate,
+    durationDays
+  };
+}
+
 (function initStoreStatus() {
   const config = readConfig();
   if (config?.server?.status) {
@@ -96,6 +125,15 @@ const verifyToken = async (req, res, next) => {
   }
 
   try {
+    const demoStatus = checkDemoExpiry();
+    if (demoStatus.expired) {
+      return res.status(403).json({
+        success: false,
+        message: demoStatus.message,
+        code: 'DEMO_EXPIRED'
+      });
+    }
+
     const storeStatus = await checkStoreStatus();
     if (storeStatus === 'inactive') {
       return res.status(403).json({
@@ -277,4 +315,4 @@ const requirePermission = (...permissions) => {
   };
 };
 
-module.exports = { verifyToken, isAdmin, requirePermission, parsePermissions, JWT_SECRET };
+module.exports = { verifyToken, isAdmin, requirePermission, parsePermissions, checkDemoExpiry, JWT_SECRET };

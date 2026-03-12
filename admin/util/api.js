@@ -41,6 +41,31 @@ api.interceptors.response.use(
     if (error.response) {
       const { status, data } = error.response;
       const message = data?.message || '';
+      const code = data?.code || '';
+
+      if (code === 'DEMO_EXPIRED') {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('adminToken');
+          localStorage.removeItem('adminUser');
+          delete api.defaults.headers.common['Authorization'];
+          window.dispatchEvent(new CustomEvent('app-blocked', { detail: { message, type: 'demo_expired' } }));
+        }
+        return Promise.reject({
+          success: false,
+          message,
+          error: 'DEMO_EXPIRED'
+        });
+      }
+
+      if (code === 'STORE_INACTIVE') {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('adminToken');
+          localStorage.removeItem('adminUser');
+          delete api.defaults.headers.common['Authorization'];
+          window.dispatchEvent(new CustomEvent('app-blocked', { detail: { message: 'Your store has been deactivated by the organization. Please contact support.', type: 'store_inactive' } }));
+        }
+        return Promise.reject({ success: false, message, error: 'STORE_INACTIVE' });
+      }
 
       if ((status === 401 || status === 403) &&
           (message.toLowerCase().includes('inactive') ||
@@ -49,14 +74,14 @@ api.interceptors.response.use(
 
         if (typeof window !== 'undefined') {
           localStorage.removeItem('adminToken');
+          localStorage.removeItem('adminUser');
           delete api.defaults.headers.common['Authorization'];
 
           const errorMsg = message.includes('role')
             ? 'Your role has been deactivated. Please contact administrator.'
-            : message.includes('Store is deactivated') ? 'Your store has been deactivated by an agency or there is an server issue, please contact us.' : 'Your account has been deactivated. Please contact administrator.';
+            : 'Your account has been deactivated. Please contact administrator.';
 
-          alert(errorMsg);
-          window.location.href = '/login';
+          window.dispatchEvent(new CustomEvent('app-blocked', { detail: { message: errorMsg, type: 'account_inactive' } }));
         }
 
         return Promise.reject({

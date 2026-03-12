@@ -21,6 +21,14 @@ export async function login(username, password) {
       };
     }
     
+    if (error.response?.data?.code === 'DEMO_EXPIRED') {
+      return {
+        success: false,
+        message: error.response.data.message || 'Demo period has expired. Please contact support.',
+        code: 'DEMO_EXPIRED'
+      };
+    }
+
     return {
       success: false,
       message: error.response?.data?.message || 'Login failed'

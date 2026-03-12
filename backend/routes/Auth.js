@@ -3,10 +3,28 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../lib/database');
-const { JWT_SECRET, verifyToken } = require('../lib/authMiddleware');
+const { JWT_SECRET, verifyToken, checkDemoExpiry } = require('../lib/authMiddleware');
+
+router.get('/demo-status', (req, res) => {
+  try {
+    const status = checkDemoExpiry();
+    res.status(200).json({ success: true, demo: status });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+  }
+});
 
 router.post('/login', async (req, res) => {
   try {
+    const demoStatus = checkDemoExpiry();
+    if (demoStatus.expired) {
+      return res.status(403).json({
+        success: false,
+        message: demoStatus.message,
+        code: 'DEMO_EXPIRED'
+      });
+    }
+
     const { username, password } = req.body;
     
     if (!username || !password) {

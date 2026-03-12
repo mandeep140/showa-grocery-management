@@ -70,6 +70,96 @@ function ConnectionStatusBanner() {
   );
 }
 
+function AppBlockedOverlay() {
+  const [blocked, setBlocked] = useState(false);
+  const [message, setMessage] = useState('');
+  const [blockType, setBlockType] = useState('');
+
+  useEffect(() => {
+    const handler = (e) => {
+      setBlocked(true);
+      setMessage(e.detail?.message || 'Access denied.');
+      setBlockType(e.detail?.type || 'blocked');
+    };
+    window.addEventListener('app-blocked', handler);
+    return () => window.removeEventListener('app-blocked', handler);
+  }, []);
+
+  useEffect(() => {
+    const checkDemo = async () => {
+      try {
+        const cm = (await import('@/util/ConnectionManager')).default;
+        const serverURL = cm.getServerURL();
+        if (!serverURL) return;
+        const res = await fetch(`${serverURL}/api/auth/demo-status`);
+        const data = await res.json();
+        if (data.success && data.demo?.expired) {
+          setBlocked(true);
+          setBlockType('demo_expired');
+          setMessage(data.demo.message || 'Demo period has expired.');
+          localStorage.removeItem('adminToken');
+          localStorage.removeItem('adminUser');
+        }
+      } catch {}
+    };
+    checkDemo();
+    const interval = setInterval(checkDemo, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!blocked) return null;
+
+  const config = {
+    demo_expired: {
+      title: 'Demo Expired',
+      icon: (
+        <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      iconBg: 'bg-amber-100'
+    },
+    store_inactive: {
+      title: 'Store Deactivated',
+      icon: (
+        <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+        </svg>
+      ),
+      iconBg: 'bg-red-100'
+    },
+    account_inactive: {
+      title: 'Account Deactivated',
+      icon: (
+        <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      ),
+      iconBg: 'bg-red-100'
+    }
+  };
+
+  const cfg = config[blockType] || { title: 'Access Denied', icon: config.store_inactive.icon, iconBg: 'bg-red-100' };
+
+  return (
+    <div className="fixed inset-0 z-[99999] bg-black/80 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
+        <div className={`w-16 h-16 ${cfg.iconBg} rounded-full flex items-center justify-center mx-auto mb-4`}>
+          {cfg.icon}
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">{cfg.title}</h2>
+        <p className="text-gray-600 mb-6">{message}</p>
+        <button
+          onClick={() => { window.location.href = '/login'; }}
+          className="bg-red-600 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-red-700 transition-colors"
+        >
+          Go to Login
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -175,6 +265,7 @@ export default function DashboardLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      <AppBlockedOverlay />
       <ConnectionStatusBanner />
       {/* Sidebar */}
       <aside

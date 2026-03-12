@@ -36,7 +36,11 @@ export default function AdminLogin() {
         setError(data.message || 'Login failed');
       }
     } catch (err) {
-      setError('An error occurred during login');
+      if (err.error === 'DEMO_EXPIRED') {
+        setError(err.message || 'Demo period has expired. Please contact support.');
+      } else {
+        setError('An error occurred during login');
+      }
     } finally {
       setLoading(false);
     }
