@@ -1,6 +1,58 @@
 const express = require('express');
 const router = express.Router();
 const net = require('net');
+const { dbRun, dbGet } = require('../lib/stockHelper');
+
+// ===== Printer Settings (DB) =====
+
+router.get('/settings', async (req, res) => {
+  try {
+    let row = await dbGet('SELECT * FROM printer_settings WHERE id = 1');
+    if (!row) {
+      await dbRun('INSERT INTO printer_settings (id) VALUES (1)');
+      row = await dbGet('SELECT * FROM printer_settings WHERE id = 1');
+    }
+    const settings = {
+      headerLine1: row.header_line1 || '',
+      headerLine2: row.header_line2 || '',
+      headerLine3: row.header_line3 || '',
+      footerLine1: row.footer_line1 || '',
+      footerLine2: row.footer_line2 || '',
+      paperWidth: row.paper_width || 32,
+      showCustomerName: !!row.show_customer_name,
+      showDueAmount: !!row.show_due_amount,
+      showPaymentMethod: !!row.show_payment_method,
+    };
+    res.json({ success: true, settings });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.put('/settings', async (req, res) => {
+  try {
+    const s = req.body;
+    await dbRun(
+      `INSERT OR REPLACE INTO printer_settings
+       (id, header_line1, header_line2, header_line3, footer_line1, footer_line2,
+        paper_width, show_customer_name, show_due_amount, show_payment_method, updated_at)
+       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [
+        s.headerLine1 || '', s.headerLine2 || '', s.headerLine3 || '',
+        s.footerLine1 || '', s.footerLine2 || '',
+        s.paperWidth || 32,
+        s.showCustomerName !== undefined ? (s.showCustomerName ? 1 : 0) : 1,
+        s.showDueAmount !== undefined ? (s.showDueAmount ? 1 : 0) : 1,
+        s.showPaymentMethod !== undefined ? (s.showPaymentMethod ? 1 : 0) : 1,
+      ]
+    );
+    res.json({ success: true, message: 'Settings saved' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ===== WiFi Printer (existing) =====
 
 router.post('/print', async (req, res) => {
   const { ip, port = 9100, data } = req.body;

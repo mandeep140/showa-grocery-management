@@ -459,6 +459,22 @@ function initDatabase() {
     `);
 
 
+    db.run(`
+      CREATE TABLE IF NOT EXISTS printer_settings (
+        id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+        header_line1 TEXT DEFAULT '',
+        header_line2 TEXT DEFAULT '',
+        header_line3 TEXT DEFAULT '',
+        footer_line1 TEXT DEFAULT '',
+        footer_line2 TEXT DEFAULT '',
+        paper_width INTEGER DEFAULT 32,
+        show_customer_name INTEGER DEFAULT 1,
+        show_due_amount INTEGER DEFAULT 1,
+        show_payment_method INTEGER DEFAULT 1,
+        updated_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+
     db.run(`CREATE INDEX IF NOT EXISTS idx_products_name ON products(name)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id)`);

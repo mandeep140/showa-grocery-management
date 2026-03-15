@@ -1,3 +1,5 @@
+import api from './api'
+
 const ESC = 0x1B
 const GS = 0x1D
 const LF = 0x0A
@@ -30,11 +32,14 @@ const DEFAULT_SETTINGS = {
   footerLine1: '',
   footerLine2: '',
   paperWidth: 32,
-  printerType: '',  
+  printerType: '',
   printerName: '',
   printerId: '',
   wifiIP: '',
   wifiPort: 9100,
+  showCustomerName: true,
+  showDueAmount: true,
+  showPaymentMethod: true,
 }
 
 export function getPrinterSettings() {
@@ -52,10 +57,58 @@ export function savePrinterSettings(settings) {
   } catch { return false }
 }
 
+export async function fetchPrinterSettings() {
+  try {
+    const res = await api.get('/api/printer/settings')
+    const data = res.data
+    if (data.success && data.settings) {
+      const local = getPrinterSettings()
+      const merged = {
+        ...local,
+        headerLine1: data.settings.headerLine1,
+        headerLine2: data.settings.headerLine2,
+        headerLine3: data.settings.headerLine3,
+        footerLine1: data.settings.footerLine1,
+        footerLine2: data.settings.footerLine2,
+        paperWidth: data.settings.paperWidth,
+        showCustomerName: data.settings.showCustomerName,
+        showDueAmount: data.settings.showDueAmount,
+        showPaymentMethod: data.settings.showPaymentMethod,
+      }
+      savePrinterSettings(merged)
+      return merged
+    }
+  } catch (err) {
+    console.error('[Printer] Failed to fetch settings from API:', err)
+  }
+  return getPrinterSettings()
+}
+
+export async function savePrinterSettingsToDb(settings) {
+  try {
+    await api.put('/api/printer/settings', {
+      headerLine1: settings.headerLine1 || '',
+      headerLine2: settings.headerLine2 || '',
+      headerLine3: settings.headerLine3 || '',
+      footerLine1: settings.footerLine1 || '',
+      footerLine2: settings.footerLine2 || '',
+      paperWidth: settings.paperWidth || 32,
+      showCustomerName: settings.showCustomerName,
+      showDueAmount: settings.showDueAmount,
+      showPaymentMethod: settings.showPaymentMethod,
+    })
+    return true
+  } catch (err) {
+    console.error('[Printer] Failed to save settings to DB:', err)
+    return false
+  }
+}
+
 export function isPrinterConfigured() {
   const s = getPrinterSettings()
   if (s.printerType === 'wifi') return !!(s.wifiIP && s.wifiPort)
   if (s.printerType === 'bluetooth') return !!s.printerName
+  if (s.printerType === 'usb') return !!s.printerId
   return false
 }
 
@@ -69,20 +122,53 @@ function repeatChar(char, count) {
   return char.repeat(count)
 }
 
-function padText(text, width, align = 'left') {
-  const str = String(text).substring(0, width)
-  if (align === 'right') return str.padStart(width)
-  if (align === 'center') {
-    const pad = Math.floor((width - str.length) / 2)
-    return ' '.repeat(pad) + str + ' '.repeat(width - pad - str.length)
+function printWidth(str) {
+  let w = 0
+  for (const ch of String(str)) {
+    const code = ch.codePointAt(0)
+    if (code > 0x7F) w += 4
+    else w += 1
   }
-  return str.padEnd(width)
+  return w
+}
+
+function truncateToPrintWidth(str, maxWidth) {
+  let w = 0
+  let result = ''
+  for (const ch of String(str)) {
+    const code = ch.codePointAt(0)
+    const cw = code > 0x7F ? 2 : 1
+    if (w + cw > maxWidth) break
+    result += ch
+    w += cw
+  }
+  return result
+}
+
+function padText(text, width, align = 'left') {
+  const str = truncateToPrintWidth(String(text), width)
+  const pw = printWidth(str)
+  const gap = width - pw
+  if (align === 'right') return ' '.repeat(Math.max(0, gap)) + str
+  if (align === 'center') {
+    const pad = Math.floor(gap / 2)
+    return ' '.repeat(Math.max(0, pad)) + str + ' '.repeat(Math.max(0, gap - pad))
+  }
+  return str + ' '.repeat(Math.max(0, gap))
 }
 
 function twoColumns(left, right, width) {
-  const rightLen = right.length
-  const leftLen = Math.max(1, width - rightLen - 1)
-  return padText(left, leftLen) + ' ' + padText(right, rightLen, 'right')
+  const rightPW = printWidth(right)
+  const leftMax = Math.max(1, width - rightPW - 1)
+  return padText(left, leftMax) + ' ' + padText(right, rightPW, 'right')
+}
+
+const WEIGHT_UNITS = ['kg', 'g', 'gram', 'grams', 'ml', 'ltr', 'l', 'litre', 'liter']
+function isWeightUnit(unit) {
+  return WEIGHT_UNITS.includes((unit || '').toLowerCase())
+}
+function isVolumeUnit(unit) {
+  return ['ml', 'ltr', 'l', 'litre', 'liter'].includes((unit || '').toLowerCase())
 }
 
 export function buildReceiptData(order, settings) {
@@ -93,10 +179,9 @@ export function buildReceiptData(order, settings) {
 
   data.push(...COMMANDS.ALIGN_CENTER)
   if (settings.headerLine1) {
-    data.push(...COMMANDS.BOLD_ON, ...COMMANDS.DOUBLE_SIZE_ON)
+    data.push(...COMMANDS.BOLD_ON)
     data.push(...textToBytes(settings.headerLine1), ...COMMANDS.FEED_LINE)
-    data.push(...COMMANDS.NORMAL_SIZE, ...COMMANDS.BOLD_OFF)
-    data.push(...COMMANDS.FEED_LINE)
+    data.push(...COMMANDS.BOLD_OFF)
   }
   if (settings.headerLine2) {
     data.push(...textToBytes(settings.headerLine2), ...COMMANDS.FEED_LINE)
@@ -109,46 +194,60 @@ export function buildReceiptData(order, settings) {
 
   data.push(...COMMANDS.ALIGN_LEFT)
   if (order.invoice_id) {
-    data.push(...textToBytes(`Invoice: ${order.invoice_id}`), ...COMMANDS.FEED_LINE)
+    const invText = order.invoice_id
+    if (order.date) {
+      const raw = String(order.date).trim()
+      const d = new Date(raw.includes('T') || raw.includes('Z') || raw.includes('+') ? raw : raw + ' UTC')
+      const dateStr = `${d.toLocaleDateString('en-IN')} ${d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`
+      data.push(...textToBytes(twoColumns(invText, dateStr, w)), ...COMMANDS.FEED_LINE)
+    } else {
+      data.push(...textToBytes(invText), ...COMMANDS.FEED_LINE)
+    }
   }
-  if (order.date) {
-    const d = new Date(order.date)
-    data.push(...textToBytes(`Date: ${d.toLocaleDateString('en-IN')} ${d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`), ...COMMANDS.FEED_LINE)
-  }
-  if (order.customer_name && order.customer_name !== 'Walk-in Customer') {
+
+  if (settings.showCustomerName !== false && order.customer_name && order.customer_name !== 'Walk-in Customer') {
     data.push(...textToBytes(`Customer: ${order.customer_name}`), ...COMMANDS.FEED_LINE)
   }
-  if (order.payment_method) {
+
+  if (settings.showPaymentMethod !== false && order.payment_method) {
     data.push(...textToBytes(`Payment: ${order.payment_method.toUpperCase()}`), ...COMMANDS.FEED_LINE)
   }
 
   data.push(...textToBytes(repeatChar('-', w)), ...COMMANDS.FEED_LINE)
 
-  const qtyW = 5, amtW = 8
-  const itemW = w - qtyW - amtW - 2
+  const snW = 3
+  const amtW = 8
+  const itemW = w - snW - amtW - 2
   data.push(...COMMANDS.BOLD_ON)
-  data.push(...textToBytes(padText('Item', itemW) + ' ' + padText('Qty', qtyW) + ' ' + padText('Amt', amtW, 'right')))
+  data.push(...textToBytes(padText('#', snW) + ' ' + padText('Item', itemW) + ' ' + padText('Amt', amtW, 'right')))
   data.push(...COMMANDS.FEED_LINE, ...COMMANDS.BOLD_OFF)
   data.push(...textToBytes(repeatChar('-', w)), ...COMMANDS.FEED_LINE)
 
-  // Items
   const items = order.items || []
-  items.forEach(item => {
-    const name = (item.name || item.product_name || '').substring(0, itemW)
-    const qty = String(item.quantity)
-    const amt = `Rs.${(item.selling_price * item.quantity).toFixed(0)}`
-    if (name.length > itemW - 2) {
-      data.push(...textToBytes(name), ...COMMANDS.FEED_LINE)
-      data.push(...textToBytes(padText('', itemW) + ' ' + padText(qty, qtyW) + ' ' + padText(amt, amtW, 'right')))
+  items.forEach((item, index) => {
+    const sn = String(index + 1)
+    const name = truncateToPrintWidth(item.name || item.product_name || '', itemW)
+    const totalAmt = `Rs.${(item.selling_price * item.quantity).toFixed(0)}`
+
+    data.push(...textToBytes(padText(sn, snW) + ' ' + padText(name, itemW) + ' ' + padText(totalAmt, amtW, 'right')))
+    data.push(...COMMANDS.FEED_LINE)
+
+    let detailLine = ''
+    if (item.is_weight && item.unit) {
+      const qtyDisplay = Math.round(item.quantity * 1000)
+      const displayUnit = isVolumeUnit(item.unit) ? 'ml' : 'g'
+      const priceUnit = isVolumeUnit(item.unit) ? '500ml' : '500g'
+      const unitPrice = item.price_per_500 || (item.selling_price / 2)
+      detailLine = `${qtyDisplay}${displayUnit} x Rs.${Math.round(unitPrice)}/${priceUnit}`
     } else {
-      data.push(...textToBytes(padText(name, itemW) + ' ' + padText(qty, qtyW) + ' ' + padText(amt, amtW, 'right')))
+      detailLine = `${item.quantity} x Rs.${item.selling_price}`
     }
+    data.push(...textToBytes('   ' + detailLine))
     data.push(...COMMANDS.FEED_LINE)
   })
 
   data.push(...textToBytes(repeatChar('-', w)), ...COMMANDS.FEED_LINE)
 
-  // Items count
   const totalItems = order.total_items || items.length
   const totalQty = order.total_qty || items.reduce((s, i) => s + i.quantity, 0)
   data.push(...textToBytes(twoColumns(`${totalItems} items`, `Qty: ${totalQty}`, w)), ...COMMANDS.FEED_LINE)
@@ -166,11 +265,11 @@ export function buildReceiptData(order, settings) {
 
   data.push(...textToBytes(repeatChar('=', w)), ...COMMANDS.FEED_LINE)
 
-  data.push(...COMMANDS.BOLD_ON, ...COMMANDS.DOUBLE_HEIGHT_ON)
+  data.push(...COMMANDS.BOLD_ON)
   data.push(...textToBytes(twoColumns('TOTAL', `Rs.${Number(order.total_amount || 0).toFixed(2)}`, w)), ...COMMANDS.FEED_LINE)
-  data.push(...COMMANDS.NORMAL_SIZE, ...COMMANDS.BOLD_OFF)
+  data.push(...COMMANDS.BOLD_OFF)
 
-  if (order.received_amount !== undefined && order.received_amount !== null) {
+  if (settings.showDueAmount !== false && order.received_amount !== undefined && order.received_amount !== null) {
     data.push(...textToBytes(twoColumns('Received', `Rs.${Number(order.received_amount).toFixed(2)}`, w)), ...COMMANDS.FEED_LINE)
     const due = Number(order.total_amount) - Number(order.received_amount)
     if (due > 0) {
@@ -180,15 +279,13 @@ export function buildReceiptData(order, settings) {
 
   data.push(...textToBytes(repeatChar('-', w)), ...COMMANDS.FEED_LINE)
 
-  // Footer
   data.push(...COMMANDS.ALIGN_CENTER)
   if (settings.footerLine1) data.push(...textToBytes(settings.footerLine1), ...COMMANDS.FEED_LINE)
   if (settings.footerLine2) data.push(...textToBytes(settings.footerLine2), ...COMMANDS.FEED_LINE)
 
-  data.push(...COMMANDS.FEED_LINE, ...textToBytes('Powered by showa.online'), ...COMMANDS.FEED_LINE)
+  data.push(...textToBytes('Powered by showa.online'), ...COMMANDS.FEED_LINE)
 
-  // Feed and cut
-  data.push(...COMMANDS.FEED_LINES(4), ...COMMANDS.CUT_PAPER)
+  data.push(...COMMANDS.FEED_LINES(3), ...COMMANDS.CUT_PAPER)
 
   return new Uint8Array(data)
 }
@@ -199,7 +296,14 @@ export function buildCartReceiptData({ cart, subtotal, taxTotal, discount, total
     date: new Date().toISOString(),
     customer_name: customerName || 'Walk-in Customer',
     payment_method: paymentMode,
-    items: cart.map(item => ({ name: item.name, quantity: item.quantity, selling_price: item.selling_price })),
+    items: cart.map(item => ({
+      name: item.name,
+      quantity: item.quantity,
+      selling_price: item.selling_price,
+      is_weight: item.is_weight || false,
+      unit: item.unit || 'pcs',
+      price_per_500: item.price_per_500 || 0,
+    })),
     subtotal, tax_amount: taxTotal, discount_amount: discount, total_amount: total, received_amount: received,
     total_items: totalItems || cart.length,
     total_qty: totalQty || cart.reduce((s, i) => s + i.quantity, 0),
@@ -211,26 +315,26 @@ let bluetoothDevice = null
 let bluetoothCharacteristic = null
 
 const BT_KNOWN_SERVICES = [
-  '000018f0-0000-1000-8000-00805f9b34fb',  // Generic thermal printer
-  'e7810a71-73ae-499d-8c15-faa9aef0c3f2',  // Some Chinese printers
-  '49535343-fe7d-4ae5-8fa9-9fafd205e455',  // ISSC/Microchip (many BLE printers)
-  '0000ff00-0000-1000-8000-00805f9b34fb',  // Common Chinese BLE printers
-  '0000fee7-0000-1000-8000-00805f9b34fb',  // Tencent / some printers
-  '0000ffe0-0000-1000-8000-00805f9b34fb',  // HM-10 BLE modules (very common)
-  '00001101-0000-1000-8000-00805f9b34fb',  // SPP (Serial Port Profile)
-  '0000ae00-0000-1000-8000-00805f9b34fb',  // Some receipt printers
-  '0000af00-0000-1000-8000-00805f9b34fb',  // Some receipt printers
+  '000018f0-0000-1000-8000-00805f9b34fb',
+  'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+  '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+  '0000ff00-0000-1000-8000-00805f9b34fb',
+  '0000fee7-0000-1000-8000-00805f9b34fb',
+  '0000ffe0-0000-1000-8000-00805f9b34fb',
+  '00001101-0000-1000-8000-00805f9b34fb',
+  '0000ae00-0000-1000-8000-00805f9b34fb',
+  '0000af00-0000-1000-8000-00805f9b34fb',
 ]
 
 const BT_KNOWN_WRITE_CHARS = [
-  '00002af1-0000-1000-8000-00805f9b34fb',  // Generic printer write
-  'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f',  // Some BLE printers
-  '49535343-8841-43f4-a8d4-ecbe34729bb3',  // ISSC write char
-  '49535343-1e4d-4bd9-ba61-23c647249616',  // ISSC write char alt
-  '0000ff02-0000-1000-8000-00805f9b34fb',  // Chinese printer write
-  '0000ffe1-0000-1000-8000-00805f9b34fb',  // HM-10 write char
-  '0000ae01-0000-1000-8000-00805f9b34fb',  // Receipt printer write
-  '0000af01-0000-1000-8000-00805f9b34fb',  // Receipt printer write
+  '00002af1-0000-1000-8000-00805f9b34fb',
+  'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f',
+  '49535343-8841-43f4-a8d4-ecbe34729bb3',
+  '49535343-1e4d-4bd9-ba61-23c647249616',
+  '0000ff02-0000-1000-8000-00805f9b34fb',
+  '0000ffe1-0000-1000-8000-00805f9b34fb',
+  '0000ae01-0000-1000-8000-00805f9b34fb',
+  '0000af01-0000-1000-8000-00805f9b34fb',
 ]
 
 async function findWritableCharacteristic(server) {
@@ -405,6 +509,141 @@ async function printViaWifi(data, settings) {
   return result
 }
 
+
+let usbDevice = null
+let usbEndpoint = null
+
+export function isUsbAvailable() {
+  return !!navigator.usb
+}
+
+async function getPairedUsbPrinter() {
+  if (!navigator.usb) return null
+  try {
+    const devices = await navigator.usb.getDevices()
+    const printer = devices.find(d =>
+      d.configuration?.interfaces?.some(iface =>
+        iface.alternates?.some(alt => alt.interfaceClass === 7)
+      )
+    )
+    return printer || (devices.length > 0 ? devices[0] : null)
+  } catch { return null }
+}
+
+export async function pairUsbPrinter() {
+  if (!navigator.usb) {
+    throw new Error('WebUSB not supported. Use Chrome or Edge browser.')
+  }
+  try {
+    const device = await navigator.usb.requestDevice({
+      filters: [{ classCode: 7 }] 
+    })
+    await openUsbDevice(device)
+    const settings = getPrinterSettings()
+    settings.printerType = 'usb'
+    settings.printerName = device.productName || 'USB Printer'
+    settings.printerId = `usb-${device.vendorId}-${device.productId}`
+    savePrinterSettings(settings)
+    return { success: true, name: settings.printerName }
+  } catch (err) {
+    if (err.name === 'NotFoundError') {
+      throw new Error('No printer selected. Please select your USB printer from the list.')
+    }
+    throw err
+  }
+}
+
+async function openUsbDevice(device) {
+  try {
+    await device.open()
+  } catch (err) {
+    if (!err.message?.includes('already open')) throw err
+  }
+
+  if (!device.configuration) {
+    await device.selectConfiguration(1)
+  }
+
+  let printerInterface = null
+  let outEndpoint = null
+
+  for (const iface of device.configuration.interfaces) {
+    for (const alt of iface.alternates) {
+      if (alt.interfaceClass === 7) {
+        printerInterface = iface
+        outEndpoint = alt.endpoints.find(ep => ep.direction === 'out' && ep.type === 'bulk')
+        break
+      }
+    }
+    if (outEndpoint) break
+  }
+
+  if (!outEndpoint) {
+    for (const iface of device.configuration.interfaces) {
+      for (const alt of iface.alternates) {
+        const ep = alt.endpoints.find(ep => ep.direction === 'out')
+        if (ep) {
+          printerInterface = iface
+          outEndpoint = ep
+          break
+        }
+      }
+      if (outEndpoint) break
+    }
+  }
+
+  if (!printerInterface || !outEndpoint) {
+    throw new Error('Could not find a writable endpoint on this USB device.')
+  }
+
+  try {
+    await device.claimInterface(printerInterface.interfaceNumber)
+  } catch (err) {
+    if (!err.message?.includes('already claimed')) throw err
+  }
+
+  usbDevice = device
+  usbEndpoint = outEndpoint
+}
+
+async function ensureUsbConnected() {
+  if (usbDevice && usbDevice.opened && usbEndpoint) return true
+
+  const device = await getPairedUsbPrinter()
+  if (!device) return false
+
+  try {
+    await openUsbDevice(device)
+    return true
+  } catch {
+    usbDevice = null
+    usbEndpoint = null
+    return false
+  }
+}
+
+async function printViaUsb(data) {
+  if (!usbDevice || !usbDevice.opened || !usbEndpoint) {
+    throw new Error('USB printer not connected.')
+  }
+
+  const CHUNK = 4096
+  for (let i = 0; i < data.length; i += CHUNK) {
+    const chunk = data.slice(i, i + CHUNK)
+    await usbDevice.transferOut(usbEndpoint.endpointNumber, chunk)
+  }
+  return { success: true }
+}
+
+export function disconnectUsbPrinter() {
+  if (usbDevice && usbDevice.opened) {
+    try { usbDevice.close() } catch {}
+  }
+  usbDevice = null
+  usbEndpoint = null
+}
+
+
 export async function testWifiConnection(ip, port) {
   const apiBase = getBackendURL()
   const res = await fetch(`${apiBase}/api/printer/test`, {
@@ -437,8 +676,15 @@ export async function connectWifiPrinter(ip, port = 9100) {
 export async function checkPrinterConnected() {
   const settings = getPrinterSettings()
 
-  if (!settings.printerType) {
-    throw new Error('No printer configured. Go to Settings → Printer to set up.')
+  if (!settings.printerType || settings.printerType === 'usb') {
+    const usbOk = await ensureUsbConnected()
+    if (usbOk) return true
+    if (settings.printerType === 'usb') {
+      throw new Error('USB printer not found. Make sure it is connected and turned on.\nIf this is first time, go to Settings → Printer and click "Pair USB Printer".')
+    }
+    if (!settings.printerType) {
+      throw new Error('No printer configured. Go to Settings → Printer to set up.')
+    }
   }
 
   if (settings.printerType === 'bluetooth') {
@@ -462,8 +708,17 @@ export async function checkPrinterConnected() {
 export async function printReceipt(receiptData) {
   const settings = getPrinterSettings()
 
-  if (!settings.printerType) {
-    throw new Error('No printer configured. Go to Settings → Printer to set up.')
+  if (!settings.printerType || settings.printerType === 'usb') {
+    const usbOk = await ensureUsbConnected()
+    if (usbOk) {
+      return await printViaUsb(receiptData)
+    }
+    if (settings.printerType === 'usb') {
+      throw new Error('USB printer not found. Make sure it is connected and turned on.')
+    }
+    if (!settings.printerType) {
+      throw new Error('No printer configured. Go to Settings → Printer to set up.')
+    }
   }
 
   if (settings.printerType === 'bluetooth') {
@@ -480,6 +735,7 @@ export async function printReceipt(receiptData) {
 
 export function removePrinter() {
   disconnectBluetoothPrinter()
+  disconnectUsbPrinter()
   const settings = getPrinterSettings()
   settings.printerType = ''
   settings.printerName = ''
@@ -502,9 +758,9 @@ export async function testPrint() {
     payment_method: 'cash',
     items: [
       { name: 'Test Product 1', quantity: 2, selling_price: 100 },
-      { name: 'Test Product 2', quantity: 1, selling_price: 250 },
+      { name: 'Dahi 500g Pack', quantity: 0.5, selling_price: 60, is_weight: true, unit: 'kg', price_per_500: 30 },
     ],
-    subtotal: 450, tax_amount: 0, discount_amount: 0, total_amount: 450, received_amount: 500,
+    subtotal: 260, tax_amount: 0, discount_amount: 0, total_amount: 260, received_amount: 300,
   }
   const data = buildReceiptData(testOrder, settings)
   await printReceipt(data)

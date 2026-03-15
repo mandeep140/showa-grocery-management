@@ -17,12 +17,16 @@ import api from '@/util/api'
 import {
     getPrinterSettings,
     savePrinterSettings,
+    fetchPrinterSettings,
+    savePrinterSettingsToDb,
     connectBluetoothPrinter,
     disconnectBluetoothPrinter,
     removePrinter,
     isBluetoothAvailable,
+    isUsbAvailable,
     testPrint,
     connectWifiPrinter,
+    pairUsbPrinter,
 } from '@/util/thermalPrinter'
 
 const Settings = () => {
@@ -56,8 +60,8 @@ const Settings = () => {
 
     useEffect(() => {
         fetchAll()
-        // Load printer settings
-        setPrinterSettings(getPrinterSettings())
+        // Load printer settings from DB
+        fetchPrinterSettings().then(s => setPrinterSettings(s))
         fetch('/api/network-info').then(r => r.json()).then(data => {
             if (data.ip) {
                 const port = typeof window !== 'undefined' ? window.location.port || '3000' : '3000'
@@ -204,8 +208,9 @@ const Settings = () => {
         setTimeout(() => setPrinterStatus(''), 3000)
     }
 
-    const handleSavePrinterSettings = () => {
+    const handleSavePrinterSettings = async () => {
         savePrinterSettings(printerSettings)
+        await savePrinterSettingsToDb(printerSettings)
         setPrinterStatus('Settings saved!')
         setTimeout(() => setPrinterStatus(''), 3000)
     }
@@ -226,6 +231,21 @@ const Settings = () => {
 
     const updatePrinterSetting = (key, value) => {
         setPrinterSettings(prev => ({ ...prev, [key]: value }))
+    }
+
+    const handleDetectUsb = async () => {
+        setPrinterConnecting(true)
+        setPrinterError('')
+        setPrinterStatus('')
+        try {
+            const result = await pairUsbPrinter()
+            setPrinterSettings(getPrinterSettings())
+            setPrinterStatus(`Connected to ${result.name}`)
+        } catch (err) {
+            setPrinterError(err.message || 'Failed to connect USB printer')
+        } finally {
+            setPrinterConnecting(false)
+        }
     }
 
     return (
@@ -354,6 +374,28 @@ const Settings = () => {
                                         <p className='mt-2 text-xs text-gray-400'>Common port is 9100 (RAW printing). Check your printer manual for the IP.</p>
                                     </div>
 
+                                    {/* USB Option */}
+                                    <div className='border border-gray-200 rounded-xl p-5 bg-white'>
+                                        <div className='flex items-center gap-2 mb-3'>
+                                            <div className='w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center'>
+                                                <svg className='w-4 h-4 text-purple-500' viewBox='0 0 24 24' fill='currentColor'><path d='M15 7v4h1v2h-3V5h2l-3-4-3 4h2v8H8v-2.07c.7-.37 1.2-1.08 1.2-1.93 0-1.21-.99-2.2-2.2-2.2-1.21 0-2.2.99-2.2 2.2 0 .85.5 1.56 1.2 1.93V13c0 1.11.89 2 2 2h3v3.05c-.71.37-1.2 1.1-1.2 1.95 0 1.22.99 2.2 2.2 2.2 1.21 0 2.2-.98 2.2-2.2 0-.85-.49-1.58-1.2-1.95V15h3c1.11 0 2-.89 2-2v-2h1V7h-4z'/></svg>
+                                            </div>
+                                            <h5 className='font-semibold text-sm text-gray-700'>USB Printer</h5>
+                                        </div>
+                                        <p className='text-xs text-gray-400 mb-3'>Connect a USB thermal printer. Pair once — it will auto-connect next time.</p>
+                                        <button
+                                            onClick={handleDetectUsb}
+                                            disabled={printerConnecting}
+                                            className='w-full py-2.5 rounded-lg bg-[#008C83] text-white text-sm font-semibold hover:bg-[#00756E] duration-150 cursor-pointer disabled:opacity-50'
+                                        >
+                                            {printerConnecting ? 'Connecting...' : 'Pair USB Printer'}
+                                        </button>
+                                        {!isUsbAvailable() && (
+                                            <p className='mt-2 text-xs text-red-400'>WebUSB not supported in this browser. Use Chrome or Edge.</p>
+                                        )}
+                                        <p className='mt-2 text-xs text-gray-400'>After pairing once, USB printer will be auto-detected when printing. No need to come here again.</p>
+                                    </div>
+
                                     <p className='text-xs text-gray-400 text-center'>Make sure your thermal printer is turned on and connected to the same network</p>
                                 </div>
                             )}
@@ -453,26 +495,81 @@ const Settings = () => {
                                     </div>
                                 </div>
 
+                                {/* Receipt Options */}
+                                <div className='bg-gray-50 border border-gray-200 rounded-xl p-6 mb-6'>
+                                    <h4 className='font-semibold text-base mb-4'>Receipt Options</h4>
+                                    <p className='text-xs text-gray-400 mb-4'>Choose which information appears on the printed receipt</p>
+                                    <div className='space-y-4'>
+                                        <div className='flex items-center justify-between'>
+                                            <div>
+                                                <p className='text-sm font-medium text-gray-700'>Show Customer Name</p>
+                                                <p className='text-xs text-gray-400'>Display customer name on receipt</p>
+                                            </div>
+                                            <button
+                                                onClick={() => updatePrinterSetting('showCustomerName', !printerSettings.showCustomerName)}
+                                                className={`w-11 h-6 rounded-full relative transition-colors duration-200 cursor-pointer ${printerSettings.showCustomerName !== false ? 'bg-[#008C83]' : 'bg-gray-300'}`}
+                                            >
+                                                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${printerSettings.showCustomerName !== false ? 'left-[22px]' : 'left-0.5'}`} />
+                                            </button>
+                                        </div>
+                                        <div className='flex items-center justify-between'>
+                                            <div>
+                                                <p className='text-sm font-medium text-gray-700'>Show Due Amount</p>
+                                                <p className='text-xs text-gray-400'>Display received & due amount on receipt</p>
+                                            </div>
+                                            <button
+                                                onClick={() => updatePrinterSetting('showDueAmount', !printerSettings.showDueAmount)}
+                                                className={`w-11 h-6 rounded-full relative transition-colors duration-200 cursor-pointer ${printerSettings.showDueAmount !== false ? 'bg-[#008C83]' : 'bg-gray-300'}`}
+                                            >
+                                                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${printerSettings.showDueAmount !== false ? 'left-[22px]' : 'left-0.5'}`} />
+                                            </button>
+                                        </div>
+                                        <div className='flex items-center justify-between'>
+                                            <div>
+                                                <p className='text-sm font-medium text-gray-700'>Show Payment Method</p>
+                                                <p className='text-xs text-gray-400'>Display payment type (Cash/UPI/Credit)</p>
+                                            </div>
+                                            <button
+                                                onClick={() => updatePrinterSetting('showPaymentMethod', !printerSettings.showPaymentMethod)}
+                                                className={`w-11 h-6 rounded-full relative transition-colors duration-200 cursor-pointer ${printerSettings.showPaymentMethod !== false ? 'bg-[#008C83]' : 'bg-gray-300'}`}
+                                            >
+                                                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${printerSettings.showPaymentMethod !== false ? 'left-[22px]' : 'left-0.5'}`} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p className='mt-4 text-xs text-gray-400 italic'>
+                                        &quot;Powered by showa.online&quot; is always printed on every receipt.
+                                    </p>
+                                </div>
+
                                 {/* Receipt Preview */}
                                 <div className='bg-gray-50 border border-gray-200 rounded-xl p-6 mb-6'>
                                     <h4 className='font-semibold text-base mb-4'>Receipt Preview</h4>
-                                    <div className='bg-white border border-gray-200 rounded-lg p-4 font-mono text-xs leading-relaxed whitespace-pre max-w-xs mx-auto shadow-sm'>
-                                        {printerSettings.headerLine1 && <div className='text-center font-bold text-sm'>{printerSettings.headerLine1}</div>}
+                                    <div className='bg-white border border-gray-200 rounded-lg p-4 font-mono text-[10px] leading-snug whitespace-pre max-w-xs mx-auto shadow-sm'>
+                                        {printerSettings.headerLine1 && <div className='text-center font-bold text-xs'>{printerSettings.headerLine1}</div>}
                                         {printerSettings.headerLine2 && <div className='text-center'>{printerSettings.headerLine2}</div>}
                                         {printerSettings.headerLine3 && <div className='text-center'>{printerSettings.headerLine3}</div>}
                                         <div className='text-center'>{'─'.repeat(printerSettings.paperWidth === 48 ? 32 : 24)}</div>
-                                        <div>Invoice: INV-001</div>
-                                        <div>Date: 23/02/2026 12:00</div>
+                                        <div className='flex justify-between'><span>INV-001</span><span>15/03/2026 12:00</span></div>
+                                        {printerSettings.showCustomerName !== false && <div>Customer: Test Customer</div>}
+                                        {printerSettings.showPaymentMethod !== false && <div>Payment: CASH</div>}
                                         <div className='text-center'>{'─'.repeat(printerSettings.paperWidth === 48 ? 32 : 24)}</div>
-                                        <div className='font-bold'>Item        Qty   Amt</div>
-                                        <div>Sample Item  2   ₹200</div>
-                                        <div>Other Item   1   ₹150</div>
+                                        <div className='font-bold'># Item                 Amt</div>
                                         <div className='text-center'>{'─'.repeat(printerSettings.paperWidth === 48 ? 32 : 24)}</div>
-                                        <div className='font-bold'>TOTAL           ₹350.00</div>
+                                        <div>1 Sample Item       ₹200</div>
+                                        <div>{'  '}2 x ₹100</div>
+                                        <div>2 Dahi 500g          ₹60</div>
+                                        <div>{'  '}500g x ₹30/500g</div>
+                                        <div className='text-center'>{'─'.repeat(printerSettings.paperWidth === 48 ? 32 : 24)}</div>
+                                        <div className='flex justify-between'><span>2 items</span><span>Qty: 3</span></div>
+                                        <div className='flex justify-between'><span>Subtotal</span><span>₹260.00</span></div>
+                                        <div className='text-center'>{'═'.repeat(printerSettings.paperWidth === 48 ? 32 : 24)}</div>
+                                        <div className='font-bold flex justify-between'><span>TOTAL</span><span>₹260.00</span></div>
+                                        {printerSettings.showDueAmount !== false && <div className='flex justify-between'><span>Received</span><span>₹300.00</span></div>}
                                         <div className='text-center'>{'─'.repeat(printerSettings.paperWidth === 48 ? 32 : 24)}</div>
                                         {printerSettings.footerLine1 && <div className='text-center'>{printerSettings.footerLine1}</div>}
                                         {printerSettings.footerLine2 && <div className='text-center'>{printerSettings.footerLine2}</div>}
-                                        <div className='text-center mt-1 text-gray-400'>Powered by showa.online</div>
+                                        <div className='text-center text-gray-400'>Powered by showa.online</div>
                                     </div>
                                 </div>
 

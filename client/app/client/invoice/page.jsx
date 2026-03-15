@@ -7,11 +7,10 @@ import { BiPrinter } from 'react-icons/bi'
 import api from '@/util/api'
 import BarcodeScanner from '@/component/BarcodeScanner'
 import {
-  getPrinterSettings,
-  isPrinterConfigured,
   buildReceiptData,
   printReceipt,
   checkPrinterConnected,
+  fetchPrinterSettings,
 } from '@/util/thermalPrinter'
 
 const statusColors = {
@@ -76,11 +75,11 @@ function InvoicePageContent() {
 
   const handlePrint = async () => {
     if (!order) return
-    if (!isPrinterConfigured()) return alert('No printer configured. Go to Settings → Printer to set up.')
     setPrinting(true)
     try {
       await checkPrinterConnected()
-      const settings = getPrinterSettings()
+      const settings = await fetchPrinterSettings()
+      const WEIGHT_UNITS = ['kg', 'g', 'gram', 'grams', 'ml', 'ltr', 'l', 'litre', 'liter']
       const receiptData = buildReceiptData({
         invoice_id: order.invoice_id,
         date: order.created_at,
@@ -90,6 +89,9 @@ function InvoicePageContent() {
           name: item.product_name,
           quantity: item.total_quantity,
           selling_price: item.selling_price,
+          unit: item.unit || 'pcs',
+          is_weight: WEIGHT_UNITS.includes((item.unit || '').toLowerCase()),
+          price_per_500: item.price_per_500 || 0,
         })),
         subtotal: order.total_sell_price,
         tax_amount: order.tax_amount,

@@ -17,11 +17,10 @@ import api from '@/util/api'
 import { getCurrentServerURL } from '@/util/api'
 import BarcodeScanner from '@/component/BarcodeScanner'
 import {
-  getPrinterSettings,
-  isPrinterConfigured,
   buildCartReceiptData,
   printReceipt,
   checkPrinterConnected,
+  fetchPrinterSettings,
 } from '@/util/thermalPrinter'
 
 const CashIcon = () => (
@@ -73,7 +72,6 @@ const BillingPage = () => {
   const handlePrintAndSave = async () => {
     if (cart.length === 0) return alert('Cart is empty')
     if (!selectedLocation) return alert('No location selected')
-    if (!isPrinterConfigured()) return alert('No printer configured. Go to Settings → Printer to set up.')
 
     if (dueAmount > 0 && (!selectedCustomer || selectedCustomer.isWalkIn)) {
       return alert('Please select a real customer for partial/credit payment (not walk-in)')
@@ -128,7 +126,7 @@ const BillingPage = () => {
       const invoiceId = res.data.invoice_id
 
       try {
-        const settings = getPrinterSettings()
+        const settings = await fetchPrinterSettings()
         const totalQty = cart.reduce((sum, item) => sum + item.quantity, 0)
         const receiptData = buildCartReceiptData({
           cart,
