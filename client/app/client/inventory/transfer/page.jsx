@@ -111,8 +111,8 @@ const Transfer = () => {
   const updateItemQuantity = (index, qty) => {
     setItems(prev => prev.map((item, i) => {
       if (i !== index) return item
-      const val = Math.max(1, Math.min(Number(qty) || 1, item.available))
-      return { ...item, quantity: val }
+      const val = Math.max(0.001, Math.min(Number(qty) || 0.001, item.available))
+      return { ...item, quantity: parseFloat(val.toFixed(3)) }
     }))
   }
 
@@ -330,8 +330,9 @@ const Transfer = () => {
                     <td className="px-4 py-3">
                       <input
                         type="number"
-                        min={1}
+                        min={0.001}
                         max={item.available}
+                        step="any"
                         value={item.quantity}
                         onChange={(e) => updateItemQuantity(idx, e.target.value)}
                         className="w-20 rounded border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm focus:border-[#008C83] focus:outline-none"

@@ -2,9 +2,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { IoMdArrowBack } from "react-icons/io"
-import { FiPlus, FiTrash2, FiSave, FiCheck } from "react-icons/fi"
+import { FiPlus, FiTrash2, FiCheck } from "react-icons/fi"
 import { MdOutlineInventory } from "react-icons/md"
 import { IoChevronDown } from "react-icons/io5"
+import { HiOutlineXMark } from "react-icons/hi2"
 import api from '@/util/api'
 import { useRouter } from 'next/navigation'
 
@@ -22,6 +23,7 @@ const emptyItem = () => ({
   showDropdown: false,
   barcode: '',
   unit: '',
+  price_unit: '',
 })
 
 const AddPurchase = () => {
@@ -90,7 +92,7 @@ const AddPurchase = () => {
   }, [])
 
   const addItem = useCallback(() => {
-    setItems(prev => [...prev, emptyItem()])
+    setItems(prev => [emptyItem(), ...prev])
   }, [])
 
   const removeItem = useCallback((key) => {
@@ -103,6 +105,7 @@ const AddPurchase = () => {
       product_name: product.name,
       barcode: product.barcode || '',
       unit: product.unit || '',
+      price_unit: product.price_unit || '',
       buying_rate: product.default_buying_rate || '',
       tax_percent: product.tax_percent || '',
       searchQuery: product.name,
@@ -150,19 +153,21 @@ const AddPurchase = () => {
   }, [updateItem, doSearch])
 
 
+  const priceMultiplier = (item) => item.price_unit ? 2 : 1
+
   const calcItemTotal = (item) => {
     const qty = parseFloat(item.quantity) || 0
     const rate = parseFloat(item.buying_rate) || 0
-    const sub = qty * rate
+    const sub = qty * rate * priceMultiplier(item)
     return sub + sub * (parseFloat(item.tax_percent) || 0) / 100
   }
 
   const getSubtotal = () =>
-    items.reduce((s, i) => s + (parseFloat(i.quantity) || 0) * (parseFloat(i.buying_rate) || 0), 0)
+    items.reduce((s, i) => s + (parseFloat(i.quantity) || 0) * (parseFloat(i.buying_rate) || 0) * priceMultiplier(i), 0)
 
   const getTaxTotal = () =>
     items.reduce((s, i) => {
-      const sub = (parseFloat(i.quantity) || 0) * (parseFloat(i.buying_rate) || 0)
+      const sub = (parseFloat(i.quantity) || 0) * (parseFloat(i.buying_rate) || 0) * priceMultiplier(i)
       return s + sub * (parseFloat(i.tax_percent) || 0) / 100
     }, 0)
 
@@ -175,7 +180,7 @@ const AddPurchase = () => {
     : 'Select supplier'
   const selectedLocationLabel = locations.find((l) => String(l.id) === String(formData.location_id))?.name || 'Select location'
 
-  const handleSubmit = useCallback(async (isDraft = false) => {
+  const handleSubmit = useCallback(async () => {
     if (submittedRef.current || submitting) return
     if (!formData.seller_id) return alert('Please select a supplier')
     if (!formData.invoice_number) return alert('Please enter invoice number')
@@ -205,7 +210,7 @@ const AddPurchase = () => {
       items: validItems.map(item => ({
         product_id: item.product_id,
         quantity: parseFloat(item.quantity),
-        buying_rate: parseFloat(item.buying_rate),
+        buying_rate: parseFloat(item.buying_rate) * (item.price_unit ? 2 : 1),
         tax_percent: parseFloat(item.tax_percent) || 0,
         expire_date: item.expire_tracking ? item.expire_date : null,
       })),
@@ -232,6 +237,50 @@ const AddPurchase = () => {
     if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation() }
   }, [])
 
+  // Quick Add Product Modal
+  const [showAddProduct, setShowAddProduct] = useState(false)
+  const [addingProduct, setAddingProduct] = useState(false)
+  const [newProduct, setNewProduct] = useState({
+    name: '', unit: 'pcs', default_buying_rate: '', default_selling_price: '',
+    bulk_quantity: '', bulk_price: '', tax_percent: '', barcode: ''
+  })
+
+  const resetNewProduct = () => setNewProduct({
+    name: '', unit: 'pcs', default_buying_rate: '', default_selling_price: '',
+    bulk_quantity: '', bulk_price: '', tax_percent: '', barcode: ''
+  })
+
+  const handleAddProduct = async () => {
+    if (!newProduct.name.trim()) return alert('Product name is required')
+    setAddingProduct(true)
+    try {
+      const priceUnit = ['kg', 'g'].includes(newProduct.unit) ? '500g' : ['liter', 'ml'].includes(newProduct.unit) ? '500ml' : null
+      const payload = {
+        name: newProduct.name.trim(),
+        unit: newProduct.unit,
+        price_unit: priceUnit,
+        default_buying_rate: parseFloat(newProduct.default_buying_rate) || 0,
+        default_selling_price: parseFloat(newProduct.default_selling_price) || 0,
+        bulk_quantity: parseFloat(newProduct.bulk_quantity) || null,
+        bulk_price: parseFloat(newProduct.bulk_price) || null,
+        tax_percent: parseFloat(newProduct.tax_percent) || 0,
+        barcode: newProduct.barcode.trim() || null,
+      }
+      const res = await api.post('/api/products', payload)
+      if (res.data.success) {
+        alert('Product created!')
+        setShowAddProduct(false)
+        resetNewProduct()
+      } else {
+        alert(res.data.message || 'Failed to create product')
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to create product')
+    } finally {
+      setAddingProduct(false)
+    }
+  }
+
   return (
     <form onSubmit={(e) => e.preventDefault()} className='w-full min-h-screen bg-[#E6FFFD] px-4 pb-8 pt-16 sm:px-8 sm:pb-10 sm:pt-10 lg:px-12 lg:py-20 xl:px-15 xl:py-24' onKeyDown={blockEnter}>
       <Link href="/client/purchase" className='flex items-center mb-4 hover:text-gray-500 duration-200'>
@@ -240,14 +289,9 @@ const AddPurchase = () => {
 
       <div className='mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between'>
         <h1 className='text-2xl font-bold sm:text-3xl'>Create Purchase Order</h1>
-        <div className='grid w-full grid-cols-2 gap-2 md:max-w-[360px]'>
-          <button type="button" onClick={() => handleSubmit(true)} disabled={submitting} className='flex h-11 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-gray-50 px-4 text-sm font-semibold text-gray-600 duration-150 hover:bg-gray-100 cursor-pointer disabled:opacity-50'>
-            <FiSave /> Save as Draft
-          </button>
-          <button type="button" onClick={() => handleSubmit(false)} disabled={submitting} className='flex h-11 items-center justify-center gap-2 rounded-lg bg-[#008C83] px-4 text-sm font-semibold text-white duration-150 hover:bg-[#00756E] cursor-pointer disabled:opacity-50'>
-            <FiCheck /> Create Order
-          </button>
-        </div>
+        <button type="button" onClick={() => handleSubmit()} disabled={submitting} className='flex h-11 items-center justify-center gap-2 rounded-lg bg-[#008C83] px-6 text-sm font-semibold text-white duration-150 hover:bg-[#00756E] cursor-pointer disabled:opacity-50'>
+          <FiCheck /> {submitting ? 'Creating...' : 'Create Order'}
+        </button>
       </div>
 
       <div className='flex flex-col gap-6 items-start xl:w-full xl:justify-between xl:flex-row'>
@@ -360,9 +404,14 @@ const AddPurchase = () => {
           <div className='bg-white rounded-xl p-4 sm:p-6 shadow-sm'>
             <div className='flex items-center justify-between mb-6'>
               <h2 className='text-lg font-bold'>Items</h2>
-              <button type="button" onClick={addItem} className='flex items-center gap-1.5 text-[#008C83] hover:text-[#00675B] font-medium duration-200 cursor-pointer'>
-                <FiPlus /> Add Item
-              </button>
+              <div className='flex items-center gap-3'>
+                <button type="button" onClick={() => setShowAddProduct(true)} className='flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#008C83] font-medium duration-200 cursor-pointer'>
+                  <FiPlus /> New Product
+                </button>
+                <button type="button" onClick={addItem} className='flex items-center gap-1.5 text-[#008C83] hover:text-[#00675B] font-medium duration-200 cursor-pointer'>
+                  <FiPlus /> Add Item
+                </button>
+              </div>
             </div>
 
             <div className='flex flex-col gap-4'>
@@ -400,10 +449,11 @@ const AddPurchase = () => {
                       )}
                     </div>
                     <div className='flex flex-col gap-1'>
-                      <label className='text-xs text-gray-400'>Quantity</label>
+                      <label className='text-xs text-gray-400'>Quantity{item.price_unit ? ` (${['500g'].includes(item.price_unit) ? 'kg' : 'liter'})` : ''}</label>
                       <input
                         type="number"
-                        min="1"
+                        min={item.price_unit ? "0.001" : "1"}
+                        step={item.price_unit ? "0.01" : "1"}
                         value={item.quantity}
                         onChange={(e) => updateItem(item._key, { quantity: e.target.value })}
                         placeholder="0"
@@ -411,7 +461,7 @@ const AddPurchase = () => {
                       />
                     </div>
                     <div className='flex flex-col gap-1'>
-                      <label className='text-xs text-gray-400'>Unit Cost</label>
+                      <label className='text-xs text-gray-400'>Unit Cost{item.price_unit ? ` (per ${item.price_unit})` : ''}</label>
                       <input
                         type="number"
                         min="0"
@@ -543,7 +593,7 @@ const AddPurchase = () => {
 
             <button
               type="button"
-              onClick={() => handleSubmit(false)}
+              onClick={() => handleSubmit()}
               disabled={submitting}
               className='w-full mt-5 py-3 bg-[#008C83] text-white rounded-lg font-medium hover:bg-[#00675B] duration-200 cursor-pointer disabled:opacity-50'
             >
@@ -567,6 +617,81 @@ const AddPurchase = () => {
           </div>
         </div>
       </div>
+
+      {/* Quick Add Product Modal */}
+      {showAddProduct && (
+        <div className='fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4'>
+          <div className='relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl bg-white p-5 sm:p-6 shadow-2xl'>
+            <div className='flex items-center justify-between mb-5'>
+              <h2 className='text-lg font-bold'>Quick Add Product</h2>
+              <button type='button' onClick={() => { setShowAddProduct(false); resetNewProduct() }} className='cursor-pointer p-1 text-gray-400 hover:text-gray-600'>
+                <HiOutlineXMark className='h-5 w-5' />
+              </button>
+            </div>
+
+            <div className='flex flex-col gap-4'>
+              <div className='flex flex-col gap-1.5'>
+                <label className='text-sm text-gray-500'>Product Name <span className='text-red-500'>*</span></label>
+                <input type='text' value={newProduct.name} onChange={(e) => setNewProduct(p => ({ ...p, name: e.target.value }))} placeholder='e.g. Basmati Rice' className='px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#008C83] duration-200' />
+              </div>
+
+              <div className='grid grid-cols-2 gap-3'>
+                <div className='flex flex-col gap-1.5'>
+                  <label className='text-sm text-gray-500'>Unit</label>
+                  <select value={newProduct.unit} onChange={(e) => setNewProduct(p => ({ ...p, unit: e.target.value }))} className='px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:border-[#008C83] duration-200'>
+                    <option value='pcs'>pcs</option>
+                    <option value='kg'>kg</option>
+                    <option value='liter'>liter</option>
+                    <option value='dozen'>dozen</option>
+                    <option value='box'>box</option>
+                    <option value='pack'>pack</option>
+                  </select>
+                </div>
+                <div className='flex flex-col gap-1.5'>
+                  <label className='text-sm text-gray-500'>Barcode</label>
+                  <input type='text' value={newProduct.barcode} onChange={(e) => setNewProduct(p => ({ ...p, barcode: e.target.value }))} placeholder='Optional' className='px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#008C83] duration-200' />
+                </div>
+              </div>
+
+              <div className='grid grid-cols-2 gap-3'>
+                <div className='flex flex-col gap-1.5'>
+                  <label className='text-sm text-gray-500'>Buying Price{['kg', 'g'].includes(newProduct.unit) ? ' (per 500g)' : ['liter', 'ml'].includes(newProduct.unit) ? ' (per 500ml)' : ''}</label>
+                  <input type='number' step='0.01' min='0' value={newProduct.default_buying_rate} onChange={(e) => setNewProduct(p => ({ ...p, default_buying_rate: e.target.value }))} placeholder='0' className='px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#008C83] duration-200' />
+                </div>
+                <div className='flex flex-col gap-1.5'>
+                  <label className='text-sm text-gray-500'>Selling Price{['kg', 'g'].includes(newProduct.unit) ? ' (per 500g)' : ['liter', 'ml'].includes(newProduct.unit) ? ' (per 500ml)' : ''}</label>
+                  <input type='number' step='0.01' min='0' value={newProduct.default_selling_price} onChange={(e) => setNewProduct(p => ({ ...p, default_selling_price: e.target.value }))} placeholder='0' className='px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#008C83] duration-200' />
+                </div>
+              </div>
+
+              <div className='grid grid-cols-2 gap-3'>
+                <div className='flex flex-col gap-1.5'>
+                  <label className='text-sm text-gray-500'>Bulk Qty{['kg', 'g'].includes(newProduct.unit) ? ' (kg)' : ['liter', 'ml'].includes(newProduct.unit) ? ' (liter)' : ''}</label>
+                  <input type='number' step={['kg', 'g', 'liter', 'ml'].includes(newProduct.unit) ? '0.01' : '1'} min='0' value={newProduct.bulk_quantity} onChange={(e) => setNewProduct(p => ({ ...p, bulk_quantity: e.target.value }))} placeholder='0' className='px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#008C83] duration-200' />
+                </div>
+                <div className='flex flex-col gap-1.5'>
+                  <label className='text-sm text-gray-500'>Bulk Price{['kg', 'g'].includes(newProduct.unit) ? ' (per 500g)' : ['liter', 'ml'].includes(newProduct.unit) ? ' (per 500ml)' : ''}</label>
+                  <input type='number' step='0.01' min='0' value={newProduct.bulk_price} onChange={(e) => setNewProduct(p => ({ ...p, bulk_price: e.target.value }))} placeholder='0' className='px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#008C83] duration-200' />
+                </div>
+              </div>
+
+              <div className='flex flex-col gap-1.5'>
+                <label className='text-sm text-gray-500'>Tax %</label>
+                <input type='number' step='0.01' min='0' max='100' value={newProduct.tax_percent} onChange={(e) => setNewProduct(p => ({ ...p, tax_percent: e.target.value }))} placeholder='0' className='px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#008C83] duration-200' />
+              </div>
+
+              <div className='mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end'>
+                <button type='button' onClick={() => { setShowAddProduct(false); resetNewProduct() }} className='rounded-lg border border-gray-300 px-5 py-2.5 text-sm duration-150 hover:bg-gray-50 cursor-pointer'>
+                  Cancel
+                </button>
+                <button type='button' onClick={handleAddProduct} disabled={addingProduct} className='rounded-lg bg-[#008C83] px-5 py-2.5 text-sm font-medium text-white duration-150 hover:bg-[#00756E] disabled:opacity-50 cursor-pointer'>
+                  {addingProduct ? 'Adding...' : 'Add Product'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   )
 }

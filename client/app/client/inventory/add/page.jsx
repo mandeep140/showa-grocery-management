@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { IoMdArrowBack } from "react-icons/io"
 import { HiOutlineQrCode } from 'react-icons/hi2'
+import { HiOutlineCamera } from 'react-icons/hi2'
 import Link from 'next/link'
 import api from '@/util/api'
 import BarcodeScanner from '@/component/BarcodeScanner'
@@ -14,13 +15,14 @@ const Add = () => {
     const [imagePreview, setImagePreview] = useState(null)
     const [imageFile, setImageFile] = useState(null)
     const fileRef = useRef(null)
+    const cameraRef = useRef(null)
     const [scannerOpen, setScannerOpen] = useState(false)
 
     const [form, setForm] = useState({
-        name: '', category_id: '', brand_id: '', unit: 'pcs',
+        name: '', category_id: '', brand_id: '', unit: 'pcs', price_unit: '',
         default_selling_price: '', default_buying_rate: '', minimum_stock_level: '',
         bulk_quantity: '', bulk_price: '', tax_percent: '',
-        product_code: '', barcode: '', description: ''
+        barcode: '', description: ''
     })
 
     useEffect(() => {
@@ -62,7 +64,9 @@ const Add = () => {
     const handleSubmit = async (e) => {
         e.preventDefault()
         if (!form.name) return alert('Product name is required')
-        if (!form.product_code) return alert('Product code is required')
+        if (parseFloat(form.default_selling_price) > 0 && parseFloat(form.default_buying_rate) > 0 && parseFloat(form.default_selling_price) <= parseFloat(form.default_buying_rate)) {
+            if (!confirm('Selling price is less than or equal to buying price. Continue?')) return
+        }
 
         setSubmitting(true)
         try {
@@ -80,10 +84,11 @@ const Add = () => {
                 ...form,
                 category_id: form.category_id || null,
                 brand_id: form.brand_id || null,
+                price_unit: form.price_unit || null,
                 default_selling_price: parseFloat(form.default_selling_price) || 0,
                 default_buying_rate: parseFloat(form.default_buying_rate) || 0,
                 minimum_stock_level: parseInt(form.minimum_stock_level) || 0,
-                bulk_quantity: parseInt(form.bulk_quantity) || null,
+                bulk_quantity: parseFloat(form.bulk_quantity) || null,
                 bulk_price: parseFloat(form.bulk_price) || null,
                 tax_percent: parseFloat(form.tax_percent) || 0,
                 img_path
@@ -103,7 +108,16 @@ const Add = () => {
         }
     }
 
-    const update = (field, value) => setForm(prev => ({ ...prev, [field]: value }))
+    const update = (field, value) => {
+        if (field === 'unit') {
+            const priceUnit = ['kg', 'g'].includes(value) ? '500g' : ['liter', 'ml'].includes(value) ? '500ml' : ''
+            setForm(prev => ({ ...prev, unit: value, price_unit: priceUnit }))
+        } else {
+            setForm(prev => ({ ...prev, [field]: value }))
+        }
+    }
+
+    const priceLabel = form.price_unit ? `(per ${form.price_unit})` : ''
 
     return (
         <div className='w-full min-h-screen px-4 sm:px-8 lg:px-15 pt-20 pb-8 bg-[#E6FFFD]'>
@@ -126,9 +140,13 @@ const Add = () => {
                                 <button type='button' onClick={() => fileRef.current?.click()} className='px-4 py-2 rounded-lg text-[#008C83] border border-[#008C83] hover:bg-[#E6FFFD] duration-200 cursor-pointer'>
                                     Upload Image
                                 </button>
+                                <button type='button' onClick={() => cameraRef.current?.click()} className='px-4 py-2 rounded-lg text-[#008C83] border border-[#008C83] hover:bg-[#E6FFFD] duration-200 cursor-pointer flex items-center gap-2 justify-center'>
+                                    <HiOutlineCamera className='h-4 w-4' /> Take Photo
+                                </button>
                                 <p className='text-xs text-gray-400'>Max 5MB. JPEG, PNG, WebP</p>
                             </div>
                             <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className='hidden' onChange={handleImageChange} />
+                            <input ref={cameraRef} type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className='hidden' onChange={handleImageChange} />
                         </div>
                     </div>
 
@@ -142,7 +160,7 @@ const Add = () => {
                             <input value={form.name} onChange={(e) => update('name', e.target.value)} placeholder="Tata salt 1KG" required className='px-4 py-2 border border-gray-300 rounded-lg' />
                         </span>
                         <span className='flex flex-col gap-2 w-full'>
-                            <label className='text-sm font-light'>Category*</label>
+                            <label className='text-sm font-light'>Category (optional)</label>
                             <select value={form.category_id} onChange={(e) => update('category_id', e.target.value)} className='px-4 py-2 border border-gray-300 rounded-lg bg-white'>
                                 <option value="">Select category</option>
                                 {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -167,9 +185,7 @@ const Add = () => {
                             <select value={form.unit} onChange={(e) => update('unit', e.target.value)} className='px-4 py-2 border border-gray-300 rounded-lg bg-white'>
                                 <option value="pcs">pcs</option>
                                 <option value="kg">kg</option>
-                                <option value="g">g</option>
                                 <option value="liter">liter</option>
-                                <option value="ml">ml</option>
                                 <option value="dozen">dozen</option>
                                 <option value="box">box</option>
                                 <option value="pack">pack</option>
@@ -177,11 +193,11 @@ const Add = () => {
                         </span>
                         <div className='w-full flex flex-col sm:flex-row gap-4'>
                             <span className='flex flex-col gap-2 w-full'>
-                                <label className='text-sm font-light'>Buying Price</label>
+                                <label className='text-sm font-light'>Buying Price {priceLabel}</label>
                                 <input type="number" step="0.01" value={form.default_buying_rate} onChange={(e) => update('default_buying_rate', e.target.value)} placeholder="₹ 18" className='px-4 py-2 border border-gray-300 rounded-lg' />
                             </span>
                             <span className='flex flex-col gap-2 w-full'>
-                                <label className='text-sm font-light'>Selling Price*</label>
+                                <label className='text-sm font-light'>Selling Price* {priceLabel}</label>
                                 <input type="number" step="0.01" value={form.default_selling_price} onChange={(e) => update('default_selling_price', e.target.value)} placeholder="₹ 22" required className='px-4 py-2 border border-gray-300 rounded-lg' />
                             </span>
                         </div>
@@ -191,11 +207,11 @@ const Add = () => {
                         </span>
                         <div className='w-full flex flex-col sm:flex-row gap-4'>
                             <span className='flex flex-col gap-2 w-full'>
-                                <label className='text-sm font-light'>Bulk quantity</label>
-                                <input type="number" value={form.bulk_quantity} onChange={(e) => update('bulk_quantity', e.target.value)} placeholder="20" className='px-4 py-2 border border-gray-300 rounded-lg' />
+                                <label className='text-sm font-light'>Bulk quantity{form.price_unit ? ` (${['500g'].includes(form.price_unit) ? 'kg' : ['500ml'].includes(form.price_unit) ? 'liter' : ''})` : ''}</label>
+                                <input type="number" step={form.price_unit ? "0.01" : "1"} min="0" value={form.bulk_quantity} onChange={(e) => update('bulk_quantity', e.target.value)} placeholder={form.price_unit ? "5" : "20"} className='px-4 py-2 border border-gray-300 rounded-lg' />
                             </span>
                             <span className='flex flex-col gap-2 w-full'>
-                                <label className='text-sm font-light'>Bulk price</label>
+                                <label className='text-sm font-light'>Bulk price {priceLabel}</label>
                                 <input type="number" step="0.01" value={form.bulk_price} onChange={(e) => update('bulk_price', e.target.value)} placeholder="₹ 17" className='px-4 py-2 border border-gray-300 rounded-lg' />
                             </span>
                         </div>
@@ -210,11 +226,6 @@ const Add = () => {
                     {/* System Information */}
                     <div className='flex flex-col gap-5'>
                         <p className='text-lg font-bold'>System information</p>
-                        <span className='flex flex-col gap-2 w-full'>
-                            <label className='text-sm font-light'>Product code*</label>
-                            <input value={form.product_code} onChange={(e) => update('product_code', e.target.value)} placeholder="TS-1KG" required className='px-4 py-2 border border-gray-300 rounded-lg' />
-                            <p className='text-xs text-gray-400 -mt-1'>Cannot be edited later</p>
-                        </span>
                         <span className='flex flex-col gap-2 w-full'>
                             <label className='text-sm font-light'>Barcode</label>
                             <div className='flex gap-2'>

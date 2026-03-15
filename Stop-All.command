@@ -1,7 +1,9 @@
 echo "Stopping Showa processes..."
 
-pkill -f "next dev" 2>/dev/null
-pkill -f "node server.js" 2>/dev/null
+# Kill by port - guaranteed cleanup
+lsof -ti:9823 | xargs kill -9 2>/dev/null
+lsof -ti:9824 | xargs kill -9 2>/dev/null
+lsof -ti:24034 | xargs kill -9 2>/dev/null
 
 echo "Done. All Showa processes stopped."
 

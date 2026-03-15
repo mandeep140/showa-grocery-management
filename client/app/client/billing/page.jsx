@@ -273,6 +273,9 @@ const BillingPage = () => {
 
   const WEIGHT_UNITS = ['kg', 'g', 'gram', 'grams', 'ml', 'ltr', 'l', 'litre', 'liter']
   const isWeightBased = (unit) => WEIGHT_UNITS.includes((unit || '').toLowerCase())
+  const isVolumeBased = (unit) => ['ml', 'ltr', 'l', 'litre', 'liter'].includes((unit || '').toLowerCase())
+  const getDisplayUnit = (unit) => isVolumeBased(unit) ? 'ml' : isWeightBased(unit) ? 'g' : unit
+  const getPriceUnit = (unit) => isVolumeBased(unit) ? '500ml' : isWeightBased(unit) ? '500g' : null
 
   const addToCart = useCallback((product) => {
     // If weight-based, show weight prompt instead of adding directly
@@ -313,35 +316,42 @@ const BillingPage = () => {
 
   const addWeightToCart = () => {
     const { product, weight } = weightModal
-    const qty = parseFloat(weight)
-    if (!qty || qty <= 0 || !product) return
+    const inputValue = parseFloat(weight)
+    if (!inputValue || inputValue <= 0 || !product) return
+    // inputValue is in grams or ml, convert to kg or liter
+    const qty = inputValue / 1000
+    // price is stored per 500g/500ml, convert to per kg/liter (×2)
+    const pricePerUnit = (product.default_selling_price || 0) * 2
+    const bulkPricePerUnit = product.bulk_price ? product.bulk_price * 2 : null
     setCart(prev => {
       const existing = prev.find(c => c.product_id === product.id)
       if (existing) {
-        const newQty = existing.quantity + qty
-        const isBulk = product.bulk_quantity && newQty >= product.bulk_quantity && product.bulk_price
+        const newQty = parseFloat((existing.quantity + qty).toFixed(3))
+        const isBulk = product.bulk_quantity && newQty >= product.bulk_quantity && bulkPricePerUnit
         return prev.map(c => c.product_id === product.id ? {
           ...c,
-          quantity: parseFloat(newQty.toFixed(3)),
-          selling_price: isBulk ? product.bulk_price : product.default_selling_price,
-          is_bulk: isBulk
+          quantity: newQty,
+          selling_price: isBulk ? bulkPricePerUnit : pricePerUnit,
+          default_selling_price: pricePerUnit,
+          is_bulk: !!isBulk,
         } : c)
       }
-      const isBulk = product.bulk_quantity && qty >= product.bulk_quantity && product.bulk_price
+      const isBulk = product.bulk_quantity && qty >= product.bulk_quantity && bulkPricePerUnit
       return [...prev, {
         product_id: product.id,
         name: product.name,
-        selling_price: isBulk ? product.bulk_price : (product.default_selling_price || 0),
+        selling_price: isBulk ? bulkPricePerUnit : pricePerUnit,
         tax_percent: product.tax_percent || 0,
-        quantity: qty,
+        quantity: parseFloat(qty.toFixed(3)),
         stock: product.total_stock || 0,
-        unit: product.unit || 'pcs',
+        unit: product.unit || 'kg',
         img_path: product.img_path || null,
         product_code: product.product_code || '',
         bulk_quantity: product.bulk_quantity || null,
         bulk_price: product.bulk_price || null,
-        default_selling_price: product.default_selling_price || 0,
-        is_bulk: isBulk,
+        default_selling_price: pricePerUnit,
+        price_per_500: product.default_selling_price || 0,
+        is_bulk: !!isBulk,
         is_weight: true
       }]
     })
@@ -384,14 +394,15 @@ const BillingPage = () => {
     setCart(prev => prev.map(item => {
       if (item.product_id !== productId) return item
       const isWeight = item.is_weight || isWeightBased(item.unit)
-      const step = isWeight ? 0.1 : 1
-      const min = isWeight ? 0.1 : 1
+      const step = isWeight ? 0.05 : 1
+      const min = isWeight ? 0.05 : 1
       const newQty = parseFloat(Math.max(min, item.quantity + delta * step).toFixed(3))
       const isBulk = item.bulk_quantity && newQty >= item.bulk_quantity && item.bulk_price
-      return { 
-        ...item, 
+      const bulkSellingPrice = isWeight ? (item.bulk_price * 2) : item.bulk_price
+      return {
+        ...item,
         quantity: newQty,
-        selling_price: isBulk ? item.bulk_price : item.default_selling_price,
+        selling_price: isBulk ? bulkSellingPrice : item.default_selling_price,
         is_bulk: isBulk
       }
     }))
@@ -404,10 +415,11 @@ const BillingPage = () => {
       const isWeight = item.is_weight || isWeightBased(item.unit)
       const qty = isWeight ? Math.max(0.001, parseFloat(Number(value).toFixed(3))) : Math.max(1, Math.floor(Number(value) || 1))
       const isBulk = item.bulk_quantity && qty >= item.bulk_quantity && item.bulk_price
-      return { 
-        ...item, 
+      const bulkSellingPrice = isWeight ? (item.bulk_price * 2) : item.bulk_price
+      return {
+        ...item,
         quantity: qty,
-        selling_price: isBulk ? item.bulk_price : item.default_selling_price,
+        selling_price: isBulk ? bulkSellingPrice : item.default_selling_price,
         is_bulk: isBulk
       }
     }))
@@ -597,7 +609,7 @@ const BillingPage = () => {
       <div className="flex flex-col lg:flex-row gap-5 items-start">
         {/* LEFT: Products */}
         <div className={`flex-1 flex flex-col ${mobileTab === 'cart' ? 'hidden lg:flex' : 'flex'}`}>
-          <div className="mb-4 flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 shadow-sm">
+          <div className="sticky top-16 z-20 mb-4 flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 shadow-sm">
             <HiMiniMagnifyingGlass className="h-5 w-5 text-gray-400 flex-shrink-0" />
             <input
               type="text"
@@ -644,11 +656,11 @@ const BillingPage = () => {
                       <div className="flex items-center justify-center h-full text-gray-300 text-xs">No Image</div>
                     )}
                     <span className="absolute right-1.5 top-1.5 rounded-md bg-[#008C83] px-2 py-0.5 text-[11px] font-bold text-white shadow-sm">
-                      ₹{product.default_selling_price || 0}
+                      ₹{product.default_selling_price || 0}{product.price_unit ? `/${product.price_unit}` : ''}
                     </span>
                     {inCart && (
                       <span className="absolute left-1.5 top-1.5 rounded-md bg-orange-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                        ×{inCart.quantity}
+                        {inCart.is_weight ? `${Math.round(inCart.quantity * 1000)}${getDisplayUnit(inCart.unit)}` : `×${inCart.quantity}`}
                       </span>
                     )}
                   </div>
@@ -772,11 +784,14 @@ const BillingPage = () => {
                 <div className="p-3 space-y-2">
                   {cart.map(item => (
                     <div key={item.product_id} className="rounded-lg border border-gray-100 bg-gray-50/50 px-3 py-2.5">
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-gray-800 truncate">{item.name}</p>
+                          <p className="text-sm font-medium text-gray-800 leading-snug break-words">{item.name}</p>
                           <p className="text-[12px] text-gray-400 mt-0.5">
-                            ₹{item.selling_price}{isWeightBased(item.unit) ? `/${item.unit}` : ''} × {item.quantity}{isWeightBased(item.unit) ? item.unit : ''}
+                            {item.is_weight
+                              ? `₹${item.price_per_500 || (item.selling_price / 2).toFixed(0)}/${getPriceUnit(item.unit)} × ${Math.round(item.quantity * 1000)}${getDisplayUnit(item.unit)}`
+                              : `₹${item.selling_price} × ${item.quantity}`
+                            }
                           </p>
                           {item.is_bulk && (
                             <p className="text-[10px] text-green-600 font-medium mt-0.5">✓ Bulk price applied</p>
@@ -786,15 +801,31 @@ const BillingPage = () => {
                           <button type="button" onClick={() => updateQuantity(item.product_id, -1)} className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 bg-white text-gray-400 hover:border-gray-300 hover:text-gray-600 cursor-pointer">
                             <HiMinusSmall className="h-3.5 w-3.5" />
                           </button>
-                          <input
-                            type="number"
-                            min={isWeightBased(item.unit) ? 0.001 : 1}
-                            step={isWeightBased(item.unit) ? 0.01 : 1}
-                            value={item.quantity}
-                            onChange={(e) => setDirectQuantity(item.product_id, e.target.value)}
-                            onBlur={(e) => { if (!e.target.value || Number(e.target.value) < (isWeightBased(item.unit) ? 0.001 : 1)) setDirectQuantity(item.product_id, isWeightBased(item.unit) ? 0.1 : 1) }}
-                            className="w-12 text-center text-sm font-medium border border-gray-200 rounded px-0.5 py-0.5 outline-none focus:border-[#008C83] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          />
+                          {item.is_weight ? (
+                            <input
+                              type="number"
+                              min={1}
+                              step={1}
+                              value={item.quantity === '' ? '' : Math.round(item.quantity * 1000)}
+                              onChange={(e) => {
+                                const grams = Number(e.target.value)
+                                if (e.target.value === '') setDirectQuantity(item.product_id, '')
+                                else setDirectQuantity(item.product_id, grams / 1000)
+                              }}
+                              onBlur={(e) => { if (!e.target.value || Number(e.target.value) < 1) setDirectQuantity(item.product_id, 0.05) }}
+                              className="w-14 text-center text-sm font-medium border border-gray-200 rounded px-0.5 py-0.5 outline-none focus:border-[#008C83] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                          ) : (
+                            <input
+                              type="number"
+                              min={1}
+                              step={1}
+                              value={item.quantity}
+                              onChange={(e) => setDirectQuantity(item.product_id, e.target.value)}
+                              onBlur={(e) => { if (!e.target.value || Number(e.target.value) < 1) setDirectQuantity(item.product_id, 1) }}
+                              className="w-12 text-center text-sm font-medium border border-gray-200 rounded px-0.5 py-0.5 outline-none focus:border-[#008C83] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                          )}
                           <button type="button" onClick={() => updateQuantity(item.product_id, 1)} className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 bg-white text-gray-400 hover:border-gray-300 hover:text-gray-600 cursor-pointer">
                             <HiPlusSmall className="h-3.5 w-3.5" />
                           </button>
@@ -1040,11 +1071,15 @@ const BillingPage = () => {
       )}
 
       {/* Weight Input Modal */}
-      {weightModal.open && weightModal.product && (
+      {weightModal.open && weightModal.product && (() => {
+        const dUnit = getDisplayUnit(weightModal.product.unit)
+        const pUnit = getPriceUnit(weightModal.product.unit)
+        const storedPrice = weightModal.product.default_selling_price || 0
+        return (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold text-gray-800">Enter Weight</h3>
+              <h3 className="text-base font-bold text-gray-800">Enter {dUnit === 'ml' ? 'Volume' : 'Weight'}</h3>
               <button type="button" onClick={() => setWeightModal({ open: false, product: null, weight: '' })} className="p-1 text-gray-400 hover:text-gray-600 cursor-pointer">
                 <HiOutlineXMark className="h-5 w-5" />
               </button>
@@ -1052,30 +1087,30 @@ const BillingPage = () => {
             <div className="mb-4">
               <p className="text-sm font-medium text-gray-700">{weightModal.product.name}</p>
               <p className="text-xs text-gray-400 mt-0.5">
-                ₹{weightModal.product.default_selling_price}/{weightModal.product.unit || 'kg'} · Stock: {weightModal.product.total_stock || 0} {weightModal.product.unit || 'kg'}
+                ₹{storedPrice}/{pUnit} · Stock: {weightModal.product.total_stock || 0} {isVolumeBased(weightModal.product.unit) ? 'liter' : 'kg'}
               </p>
             </div>
             <div className="mb-4">
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">Weight ({weightModal.product.unit || 'kg'})</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">{dUnit === 'ml' ? 'Volume' : 'Weight'} ({dUnit})</label>
               <input
                 type="number"
-                min={0.001}
-                step={0.01}
+                min={1}
+                step={1}
                 autoFocus
                 value={weightModal.weight}
                 onChange={(e) => setWeightModal(prev => ({ ...prev, weight: e.target.value }))}
                 onKeyDown={(e) => { if (e.key === 'Enter') addWeightToCart() }}
-                placeholder={`e.g. 0.5 ${weightModal.product.unit || 'kg'}`}
+                placeholder={`e.g. 500 ${dUnit}`}
                 className="h-11 w-full rounded-lg border border-gray-200 px-3.5 text-sm outline-none focus:border-[#008C83]"
               />
               {weightModal.weight && Number(weightModal.weight) > 0 && (
                 <p className="text-xs text-gray-400 mt-1.5">
-                  Total: <span className="font-semibold text-[#008C83]">₹{(weightModal.product.default_selling_price * Number(weightModal.weight)).toFixed(2)}</span>
+                  Total: <span className="font-semibold text-[#008C83]">₹{((Number(weightModal.weight) / 500) * storedPrice).toFixed(2)}</span>
                 </p>
               )}
             </div>
             <div className="flex gap-2">
-              {[0.25, 0.5, 1, 2, 5].map(q => (
+              {[100, 250, 500, 750, 1000].map(q => (
                 <button
                   key={q}
                   type="button"
@@ -1084,7 +1119,7 @@ const BillingPage = () => {
                     weightModal.weight === String(q) ? 'border-[#008C83] bg-[#E6FFFD] text-[#008C83]' : 'border-gray-200 text-gray-500 hover:border-gray-300'
                   }`}
                 >
-                  {q}
+                  {q}{dUnit}
                 </button>
               ))}
             </div>
@@ -1098,7 +1133,8 @@ const BillingPage = () => {
             </button>
           </div>
         </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

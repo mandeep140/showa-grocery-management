@@ -4,14 +4,12 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
 
 mkdir -p "$DIR/logs"
 
-# Start backend
 cd "$DIR/backend"
 nohup node server.js >> "$DIR/logs/backend.log" 2>&1 &
 disown
 
-# Start admin dev server
 cd "$DIR/admin"
-nohup npm run dev >> "$DIR/logs/admin.log" 2>&1 &
+nohup npm start >> "$DIR/logs/admin.log" 2>&1 &
 disown
 
 (sleep 3 && open "http://localhost:9824") &

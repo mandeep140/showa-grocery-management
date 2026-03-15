@@ -104,13 +104,14 @@ const Reduce = () => {
     if (submitting) return
     if (!selectedBatch) return alert('Select a product and batch')
     if (!quantity || Number(quantity) <= 0) return alert('Enter valid quantity')
-    if (Number(quantity) > selectedBatch.quantity_remaining) return alert(`Maximum available: ${selectedBatch.quantity_remaining}`)
+    const actualQty = isWeight ? Number(quantity) / 1000 : Number(quantity)
+    if (actualQty > selectedBatch.quantity_remaining) return alert(`Maximum available: ${isWeight ? Math.round(selectedBatch.quantity_remaining * 1000) : selectedBatch.quantity_remaining}`)
 
     setSubmitting(true)
     try {
       const res = await api.post('/api/disposal', {
         batch_id: selectedBatch.id,
-        quantity: Number(quantity),
+        quantity: actualQty,
         disposal_method: reason,
         notes: notes || null,
       })
@@ -126,6 +127,11 @@ const Reduce = () => {
       setSubmitting(false)
     }
   }
+
+  const WEIGHT_UNITS = ['kg', 'g', 'gram', 'grams', 'ml', 'ltr', 'l', 'litre', 'liter']
+  const isWeight = selectedProduct && WEIGHT_UNITS.includes((selectedProduct.unit || '').toLowerCase())
+  const isVolume = selectedProduct && ['ml', 'ltr', 'l', 'litre', 'liter'].includes((selectedProduct.unit || '').toLowerCase())
+  const displayUnit = isVolume ? 'ml' : isWeight ? 'g' : (selectedProduct?.unit || 'pcs')
 
   const totalStock = selectedProduct
     ? batches.reduce((s, b) => s + b.quantity_remaining, 0)
@@ -222,7 +228,7 @@ const Reduce = () => {
           )}
           {selectedProduct && (
             <p className="mt-2 text-sm text-gray-400">
-              Total stock: <span className="font-medium text-gray-600">{totalStock} {selectedProduct.unit || 'pcs'}</span>
+              Total stock: <span className="font-medium text-gray-600">{isWeight ? `${(totalStock * 1000).toFixed(0)} ${displayUnit}` : `${totalStock} ${selectedProduct.unit || 'pcs'}`}</span>
             </p>
           )}
         </div>
@@ -264,18 +270,18 @@ const Reduce = () => {
 
         {/* Quantity */}
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-600">Quantity to reduce *</label>
+          <label className="mb-1.5 block text-sm font-medium text-gray-600">Quantity to reduce *{isWeight ? ` (${displayUnit})` : ''}</label>
           <input
             type="number"
             min={1}
-            max={selectedBatch?.quantity_remaining || 0}
+            max={isWeight ? Math.round((selectedBatch?.quantity_remaining || 0) * 1000) : (selectedBatch?.quantity_remaining || 0)}
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
             className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm duration-200 focus:border-[#008C83] focus:outline-none"
-            placeholder="Enter quantity"
+            placeholder={isWeight ? `Enter ${displayUnit}` : 'Enter quantity'}
           />
           {selectedBatch && (
-            <p className="mt-1 text-sm text-gray-400">Maximum available: {selectedBatch.quantity_remaining} pcs</p>
+            <p className="mt-1 text-sm text-gray-400">Maximum available: {isWeight ? `${Math.round(selectedBatch.quantity_remaining * 1000)} ${displayUnit}` : `${selectedBatch.quantity_remaining} pcs`}</p>
           )}
         </div>
 

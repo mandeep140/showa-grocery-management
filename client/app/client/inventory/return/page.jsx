@@ -87,16 +87,24 @@ const Return = () => {
     cProductSearchTimeout.current = setTimeout(() => searchCProducts(value), 300)
   }
 
+  const WEIGHT_UNITS = ['kg', 'g', 'gram', 'grams', 'ml', 'ltr', 'l', 'litre', 'liter']
+  const isWeightBased = (unit) => WEIGHT_UNITS.includes((unit || '').toLowerCase())
+  const isVolumeBased = (unit) => ['ml', 'ltr', 'l', 'litre', 'liter'].includes((unit || '').toLowerCase())
+  const getDisplayUnit = (unit) => isVolumeBased(unit) ? 'ml' : isWeightBased(unit) ? 'g' : unit
+
   const addReturnItem = (product) => {
+    const isWeight = isWeightBased(product.unit)
     if (returnItems.find(i => i.product_id === product.id)) {
-      setReturnItems(prev => prev.map(i => i.product_id === product.id ? { ...i, quantity: i.quantity + 1 } : i))
+      setReturnItems(prev => prev.map(i => i.product_id === product.id ? { ...i, quantity: isWeight ? i.quantity + 0.5 : i.quantity + 1 } : i))
     } else {
       setReturnItems(prev => [...prev, {
         product_id: product.id,
         product_name: product.name,
-        quantity: 1,
-        selling_price: product.default_selling_price || 0,
+        quantity: isWeight ? 0.5 : 1,
+        selling_price: isWeight ? (product.default_selling_price || 0) * 2 : (product.default_selling_price || 0),
         unit: product.unit || 'pcs',
+        price_unit: product.price_unit || '',
+        is_weight: isWeight,
       }])
     }
     setCProductSearch('')
@@ -125,7 +133,15 @@ const Return = () => {
   }
 
   const updateReturnItemQty = (index, qty) => {
-    setReturnItems(prev => prev.map((item, i) => i === index ? { ...item, quantity: Math.max(1, Number(qty) || 1) } : item))
+    setReturnItems(prev => prev.map((item, i) => {
+      if (i !== index) return item
+      if (item.is_weight) {
+        // Input is in grams/ml, store in kg/liter
+        const val = Number(qty) / 1000
+        return { ...item, quantity: Math.max(0.001, val) }
+      }
+      return { ...item, quantity: Math.max(1, Number(qty) || 1) }
+    }))
   }
 
   const updateReturnItemPrice = (index, price) => {
@@ -471,15 +487,20 @@ const Return = () => {
                   <tbody>
                     {returnItems.map((item, index) => (
                       <tr key={index} className="border-t border-gray-100">
-                        <td className="px-4 py-2.5 font-medium text-gray-700">{item.product_name}</td>
+                        <td className="px-4 py-2.5 font-medium text-gray-700">
+                          {item.product_name}
+                          {item.is_weight && <span className="text-xs text-gray-400 ml-1">({getDisplayUnit(item.unit)})</span>}
+                        </td>
                         <td className="px-4 py-2.5">
                           <input
                             type="number"
-                            min={1}
-                            value={item.quantity}
+                            min={item.is_weight ? 1 : 1}
+                            step={item.is_weight ? 1 : 1}
+                            value={item.is_weight ? Math.round(item.quantity * 1000) : item.quantity}
                             onChange={(e) => updateReturnItemQty(index, e.target.value)}
                             className="w-20 px-2 py-1 border border-gray-200 rounded text-center text-sm"
                           />
+                          {item.is_weight && <span className="text-xs text-gray-400 ml-1">{getDisplayUnit(item.unit)}</span>}
                         </td>
                         <td className="px-4 py-2.5">
                           <input

@@ -44,21 +44,21 @@ async function deductStockFIFO(productId, locationId, quantity) {
   const deductions = [];
 
   for (const batch of batches) {
-    if (remaining <= 0) break;
+    if (remaining <= 0.0001) break;
     const deduct = Math.min(remaining, batch.quantity_remaining);
     deductions.push({
       batch_id: batch.id,
       product_id: productId,
       location_id: locationId,
-      quantity: deduct,
+      quantity: parseFloat(deduct.toFixed(4)),
       buying_rate: batch.buying_rate,
       quantity_before: batch.quantity_remaining,
-      quantity_after: batch.quantity_remaining - deduct
+      quantity_after: parseFloat((batch.quantity_remaining - deduct).toFixed(4))
     });
-    remaining -= deduct;
+    remaining = parseFloat((remaining - deduct).toFixed(4));
   }
 
-  if (remaining > 0) {
+  if (remaining > 0.0001) {
     const product = await dbGet(`SELECT name FROM products WHERE id = ?`, [productId]);
     throw new Error(`Insufficient stock for "${product?.name || productId}". Short by ${remaining} units.`);
   }
@@ -73,7 +73,7 @@ async function deductStockFIFO(productId, locationId, quantity) {
 async function addStockToBatch(batchId, quantity) {
   const batch = await dbGet(`SELECT * FROM batches WHERE id = ?`, [batchId]);
   if (!batch) throw new Error('Batch not found');
-  const newQuantity = batch.quantity_remaining + quantity;
+  const newQuantity = parseFloat((batch.quantity_remaining + quantity).toFixed(4));
   await dbRun(`UPDATE batches SET quantity_remaining = ? WHERE id = ?`, [newQuantity, batchId]);
   return {
     batch_id: batchId,

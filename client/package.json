@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --experimental-https -H 0.0.0.0 --port 9823",
     "build": "next build",
-    "start": "next start --experimental-https -H 0.0.0.0 --port 9823",
+    "start": "node server.js",
     "lint": "eslint"
   },
   "dependencies": {

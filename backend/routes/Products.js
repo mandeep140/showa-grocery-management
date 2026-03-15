@@ -209,15 +209,16 @@ router.get('/:id', verifyToken, requirePermission(['inventory_view', 'billing', 
 
 router.post('/', verifyToken, requirePermission('inventory_create'), async (req, res) => {
   try {
-    const { product_code, name, unit, category_id, brand_id, default_buying_rate, default_selling_price, minimum_stock_level, bulk_quantity, bulk_price, tax_percent, barcode, img_path, description } = req.body;
+    const { name, unit, price_unit, category_id, brand_id, default_buying_rate, default_selling_price, minimum_stock_level, bulk_quantity, bulk_price, tax_percent, barcode, img_path, description } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Product name is required' });
 
-    const code = product_code || `PRD-${Date.now()}`;
+    const shortName = name.trim().replace(/[^a-zA-Z0-9]/g, '').substring(0, 8).toUpperCase();
+    const code = `${shortName}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const result = await dbRun(
-      `INSERT INTO products (product_code, name, unit, category_id, brand_id, default_buying_rate, default_selling_price, minimum_stock_level, bulk_quantity, bulk_price, tax_percent, barcode, img_path, description)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [code, name, unit || 'pcs', category_id || null, brand_id || null, default_buying_rate || 0, default_selling_price || 0, minimum_stock_level || 0, bulk_quantity || null, bulk_price || null, tax_percent || 0, barcode || null, img_path || null, description || null]
+      `INSERT INTO products (product_code, name, unit, price_unit, category_id, brand_id, default_buying_rate, default_selling_price, minimum_stock_level, bulk_quantity, bulk_price, tax_percent, barcode, img_path, description)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [code, name, unit || 'pcs', price_unit || null, category_id || null, brand_id || null, default_buying_rate || 0, default_selling_price || 0, minimum_stock_level || 0, bulk_quantity || null, bulk_price || null, tax_percent || 0, barcode || null, img_path || null, description || null]
     );
 
     res.status(201).json({ success: true, message: 'Product created', id: result.lastID, product_code: code });
@@ -231,13 +232,13 @@ router.post('/', verifyToken, requirePermission('inventory_create'), async (req,
 
 router.put('/:id', verifyToken, requirePermission('inventory_edit'), async (req, res) => {
   try {
-    const { product_code, name, unit, category_id, brand_id, default_buying_rate, default_selling_price, minimum_stock_level, bulk_quantity, bulk_price, tax_percent, barcode, img_path, description, is_active } = req.body;
+    const { product_code, name, unit, price_unit, category_id, brand_id, default_buying_rate, default_selling_price, minimum_stock_level, bulk_quantity, bulk_price, tax_percent, barcode, img_path, description, is_active } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Product name is required' });
 
     const result = await dbRun(
-      `UPDATE products SET product_code = ?, name = ?, unit = ?, category_id = ?, brand_id = ?, default_buying_rate = ?, default_selling_price = ?, minimum_stock_level = ?, bulk_quantity = ?, bulk_price = ?, tax_percent = ?, barcode = ?, img_path = ?, description = ?, is_active = ?, updated_at = datetime('now')
+      `UPDATE products SET product_code = ?, name = ?, unit = ?, price_unit = ?, category_id = ?, brand_id = ?, default_buying_rate = ?, default_selling_price = ?, minimum_stock_level = ?, bulk_quantity = ?, bulk_price = ?, tax_percent = ?, barcode = ?, img_path = ?, description = ?, is_active = ?, updated_at = datetime('now')
       WHERE id = ?`,
-      [product_code || null, name, unit || 'pcs', category_id || null, brand_id || null, default_buying_rate || 0, default_selling_price || 0, minimum_stock_level || 0, bulk_quantity || null, bulk_price || null, tax_percent || 0, barcode || null, img_path || null, description || null, is_active !== undefined ? is_active : 1, req.params.id]
+      [product_code || null, name, unit || 'pcs', price_unit || null, category_id || null, brand_id || null, default_buying_rate || 0, default_selling_price || 0, minimum_stock_level || 0, bulk_quantity || null, bulk_price || null, tax_percent || 0, barcode || null, img_path || null, description || null, is_active !== undefined ? is_active : 1, req.params.id]
     );
 
     if (result.changes === 0) return res.status(404).json({ success: false, message: 'Product not found' });

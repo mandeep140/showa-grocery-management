@@ -130,11 +130,11 @@ const View = () => {
                         <p className='text-md'>{product.unit}</p>
                     </div>
                     <div>
-                        <p className='text-sm text-gray-400'>Selling price</p>
+                        <p className='text-sm text-gray-400'>Selling price{product.price_unit ? ` (per ${product.price_unit})` : ''}</p>
                         <p className='text-md font-semibold text-green-500'>{`\u20B9 ${product.default_selling_price}`}</p>
                     </div>
                     <div>
-                        <p className='text-sm text-gray-400'>Buying price</p>
+                        <p className='text-sm text-gray-400'>Buying price{product.price_unit ? ` (per ${product.price_unit})` : ''}</p>
                         <p className='text-md'>{`\u20B9 ${product.default_buying_rate}`}</p>
                     </div>
                     <div>
@@ -142,11 +142,11 @@ const View = () => {
                         <p className='text-md'>{product.tax_percent}%</p>
                     </div>
                     <div>
-                        <p className='text-sm text-gray-400'>Bulk quantity</p>
+                        <p className='text-sm text-gray-400'>Bulk quantity{product.price_unit ? ` (${product.price_unit === '500g' ? 'kg' : product.price_unit === '500ml' ? 'liter' : ''})` : ''}</p>
                         <p className='text-md'>{product.bulk_quantity || '-'}</p>
                     </div>
                     <div>
-                        <p className='text-sm text-gray-400'>Bulk price</p>
+                        <p className='text-sm text-gray-400'>Bulk price{product.price_unit ? ` (per ${product.price_unit})` : ''}</p>
                         <p className='text-md font-semibold text-green-500'>{product.bulk_price ? `\u20B9 ${product.bulk_price}` : '-'}</p>
                     </div>
                     <div>
